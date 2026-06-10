@@ -149,7 +149,13 @@ export default function App() {
     setScreen("preview");
   }
 
-  function imprimirPDF() { window.print(); }
+  function imprimirPDF(inf) {
+    const titulo = `${inf.numero} - ${inf.cliente}`;
+    const prevTitle = document.title;
+    document.title = titulo;
+    window.print();
+    document.title = prevTitle;
+  }
 
   function compartirWhatsApp(informe, config, fechaFmt) {
     const texto = `Hola, adjunto informe de mantención eléctrica *${informe.numero}* correspondiente a *${informe.cliente}* con fecha ${fechaFmt}.\n\nTableros inspeccionados: ${informe.tableros.length}\nPersonal: ${informe.personal.filter(Boolean).join(", ")}\n\nPor favor revisar el informe adjunto. Saludos, ${config.empresa}.`;
@@ -399,7 +405,7 @@ export default function App() {
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Necesitarás el archivo para adjuntarlo al enviar</div>
               </div>
             </div>
-            <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", marginBottom: 10 }} onClick={() => { imprimirPDF(); }}>
+            <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", marginBottom: 10 }} onClick={() => { setEnviarScreen(false); setTimeout(() => imprimirPDF(informe), 300); }}>
               🖨 Guardar / Imprimir PDF
             </button>
             {!paso1Listo && (
@@ -457,7 +463,7 @@ export default function App() {
             <button style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={() => { setEnviarScreen(true); setPaso1Listo(false); }}>
               📤 Enviar informe
             </button>
-            <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 12px" }} onClick={imprimirPDF}>
+            <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 12px" }} onClick={() => imprimirPDF(informe)}>
               🖨 PDF
             </button>
           </div>
