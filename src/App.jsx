@@ -84,8 +84,8 @@ export default function App() {
   const [informe, setInforme] = useState(null);
   const [editIdx, setEditIdx] = useState(null);
   const [tableroEdit, setTableroEdit] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [mejorando, setMejorando] = useState({}); // {campo: bool}
+  const [enviarScreen, setEnviarScreen] = useState(false);
+  const [paso1Listo, setPaso1Listo] = useState(false);
   const fileRef = useRef();
 
   const numInforme = `INF-${String(counter).padStart(4,"0")}`;
@@ -152,11 +152,8 @@ export default function App() {
   function imprimirPDF() { window.print(); }
 
   function compartirWhatsApp(informe, config, fechaFmt) {
-    imprimirPDF();
-    setTimeout(() => {
-      const texto = `Hola, adjunto informe de mantención eléctrica *${informe.numero}* correspondiente a *${informe.cliente}* con fecha ${fechaFmt}.\n\nTableros inspeccionados: ${informe.tableros.length}\nPersonal: ${informe.personal.filter(Boolean).join(", ")}\n\nPor favor revisar el informe adjunto. Saludos, ${config.empresa}.`;
-      window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
-    }, 1000);
+    const texto = `Hola, adjunto informe de mantención eléctrica *${informe.numero}* correspondiente a *${informe.cliente}* con fecha ${fechaFmt}.\n\nTableros inspeccionados: ${informe.tableros.length}\nPersonal: ${informe.personal.filter(Boolean).join(", ")}\n\nPor favor revisar el informe adjunto. Saludos, ${config.empresa}.`;
+    window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
   }
 
   function enviarEmail(informe, config, fechaFmt) {
@@ -377,6 +374,74 @@ export default function App() {
     </div>
   );
 
+  // ── ENVIAR ──
+  if (screen === "preview" && enviarScreen && informe) {
+    const fechaFmt = new Date(informe.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
+    return (
+      <div style={s.app}>
+        <div style={s.header}>
+          <Logo size={32} withText={true} />
+          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => { setEnviarScreen(false); setPaso1Listo(false); }}>← Volver</button>
+        </div>
+        <div style={{ background: ACCENT, padding: "10px 18px" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>📤 Enviar informe {informe.numero}</span>
+        </div>
+        <div style={s.body}>
+
+          {/* PASO 1 */}
+          <div style={{ ...s.card, border: paso1Listo ? "2px solid #27ae60" : "1px solid #e0e0e0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: paso1Listo ? "#27ae60" : ACCENT, color: paso1Listo ? "white" : PRIMARY, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                {paso1Listo ? "✓" : "1"}
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: PRIMARY }}>Guarda el PDF en tu celular</div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Necesitarás el archivo para adjuntarlo al enviar</div>
+              </div>
+            </div>
+            <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", marginBottom: 10 }} onClick={() => { imprimirPDF(); }}>
+              🖨 Guardar / Imprimir PDF
+            </button>
+            {!paso1Listo && (
+              <button style={{ ...s.btnGhost, width: "100%", fontSize: 13 }} onClick={() => setPaso1Listo(true)}>
+                ✓ Ya guardé el PDF
+              </button>
+            )}
+            {paso1Listo && (
+              <div style={{ textAlign: "center", fontSize: 13, color: "#27ae60", fontWeight: 700 }}>✓ PDF guardado</div>
+            )}
+          </div>
+
+          {/* PASO 2 */}
+          <div style={{ ...s.card, opacity: paso1Listo ? 1 : 0.4, pointerEvents: paso1Listo ? "auto" : "none" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: paso1Listo ? ACCENT : "#e0e0e0", color: paso1Listo ? PRIMARY : "#aaa", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>2</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: PRIMARY }}>Elige cómo enviar</div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Adjunta el PDF guardado en el mensaje</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button style={{ ...s.btn, background: "#25D366", color: "white", width: "100%", padding: 13, fontSize: 14 }}
+                onClick={() => compartirWhatsApp(informe, config, fechaFmt)}>
+                📱 Enviar por WhatsApp
+              </button>
+              <button style={{ ...s.btn, background: "#0072c6", color: "white", width: "100%", padding: 13, fontSize: 14 }}
+                onClick={() => enviarEmail(informe, config, fechaFmt)}>
+                ✉ Enviar por Email
+              </button>
+            </div>
+          </div>
+
+          <div style={{ padding: "12px 14px", background: "#fff9ec", border: "1px solid #ffe082", borderRadius: 8, fontSize: 12, color: "#7c5800", lineHeight: 1.6 }}>
+            💡 <strong>Recuerda:</strong> una vez abierto WhatsApp o el correo, adjunta manualmente el PDF que guardaste en el paso 1.
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
   // ── PREVIEW ──
   if (screen === "preview" && informe) {
     const criticos = informe.tableros.filter(t => t.criticidad === "Crítico").length;
@@ -386,14 +451,11 @@ export default function App() {
 
     return (
       <div style={{ fontFamily: FONT, fontSize: 14, background: BG }}>
-        <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }} className="no-print">
+        <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }} className="no-print">
           <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button style={{ ...s.btn, background: "#25D366", color: "white", fontSize: 12, padding: "8px 12px" }} onClick={() => compartirWhatsApp(informe, config, fechaFmt)}>
-              📎 PDF + WhatsApp
-            </button>
-            <button style={{ ...s.btn, background: "#0072c6", color: "white", fontSize: 12, padding: "8px 12px" }} onClick={() => enviarEmail(informe, config, fechaFmt)}>
-              ✉ Email
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={() => { setEnviarScreen(true); setPaso1Listo(false); }}>
+              📤 Enviar informe
             </button>
             <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 12px" }} onClick={imprimirPDF}>
               🖨 PDF
