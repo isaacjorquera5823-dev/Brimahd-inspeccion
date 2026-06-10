@@ -166,7 +166,7 @@ export default function App() {
           ${t.garantia ? '<span style="margin-left:6px;font-size:11px;background:#e8f4fd;color:#1a5276;padding:3px 8px;border-radius:10px;font-weight:700;">En garantía</span>' : ''}
           ${t.observaciones ? `<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 5px;">Observaciones</div><div style="font-size:13px;color:#333;line-height:1.6;white-space:pre-wrap;">${t.observaciones}</div>` : ''}
           ${t.acciones ? `<div style="font-size:10px;font-weight:700;color:#2c2c2c;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 5px;">Acciones ejecutadas</div><div style="font-size:13px;color:#333;line-height:1.6;white-space:pre-wrap;background:#f0f7f0;padding:8px 12px;border-radius:6px;border-left:3px solid #27ae60;">${t.acciones}</div>` : ''}
-          ${t.fotos?.length > 0 ? `<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 8px;">Fotografías</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${t.fotos.map(f => `<img src="${f.data}" style="width:140px;height:105px;object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;" />`).join('')}</div>` : ''}
+          ${t.fotos?.length > 0 ? `<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 8px;">Fotografías</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${t.fotos.map(f => `<img src="${f.data}" style="width:420px;height:315px;object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;" />`).join('')}</div>` : ''}
         </div>
       </div>`).join('');
 
