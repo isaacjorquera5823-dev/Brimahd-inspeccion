@@ -331,12 +331,7 @@ export default function App() {
         <div style={s.card}>
 
           <label style={s.label}>Nombre del tablero</label>
-          <div style={{ ...s.row, marginBottom: 10 }}>
-            <input style={{ ...s.input, marginBottom: 0, flex: 1 }} value={tableroEdit.nombre} onChange={e => setTableroEdit(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Tablero General Shaft" />
-            <button style={{ ...s.btnIA, whiteSpace: "nowrap" }} onClick={() => mejorarCampoTablero("nombre")} disabled={mejorando.nombre}>
-              {mejorando.nombre ? "..." : "✨"}
-            </button>
-          </div>
+          <input style={s.input} value={tableroEdit.nombre} onChange={e => setTableroEdit(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Tablero General Shaft" />
 
           <label style={s.label}>Piso</label>
           <select style={s.input} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
@@ -360,15 +355,9 @@ export default function App() {
 
           <label style={s.label}>Observaciones encontradas</label>
           <textarea style={s.textarea} value={tableroEdit.observaciones} onChange={e => setTableroEdit(p => ({ ...p, observaciones: e.target.value }))} placeholder="Describe los problemas detectados..." />
-          <button style={{ ...s.btnIA, marginBottom: 10 }} onClick={() => mejorarCampoTablero("observaciones")} disabled={mejorando.observaciones}>
-            {mejorando.observaciones ? "Mejorando..." : "✨ Mejorar redacción"}
-          </button>
 
           <label style={s.label}>Acciones ejecutadas en esta visita</label>
           <textarea style={s.textarea} value={tableroEdit.acciones} onChange={e => setTableroEdit(p => ({ ...p, acciones: e.target.value }))} placeholder="Ej: Se cambian fusibles, se instala mica en barra..." />
-          <button style={{ ...s.btnIA, marginBottom: 10 }} onClick={() => mejorarCampoTablero("acciones")} disabled={mejorando.acciones}>
-            {mejorando.acciones ? "Mejorando..." : "✨ Mejorar redacción"}
-          </button>
 
           <label style={s.label}>Fotos</label>
           <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" style={{ display: "none" }} onChange={handleFotos} />
