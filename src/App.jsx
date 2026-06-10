@@ -149,12 +149,85 @@ export default function App() {
     setScreen("preview");
   }
 
-  function imprimirPDF(inf) {
-    const titulo = `${inf.numero} - ${inf.cliente}`;
-    const prevTitle = document.title;
-    document.title = titulo;
-    window.print();
-    document.title = prevTitle;
+  function descargarHTML(inf, cfg) {
+    const fechaFmt = new Date(inf.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
+    const criticos = inf.tableros.filter(t => t.criticidad === "Crítico").length;
+    const atencion = inf.tableros.filter(t => t.criticidad === "Atención").length;
+    const planif = inf.tableros.filter(t => t.criticidad === "Planificado").length;
+
+    const tablerosHTML = inf.tableros.map(t => `
+      <div style="border:1px solid #e0e0e0;border-radius:8px;margin-bottom:16px;overflow:hidden;">
+        <div style="background:#2c2c2c;color:white;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:14px;font-weight:700;">${t.nombre}</span>
+          <span style="font-size:11px;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:12px;">${t.piso}</span>
+        </div>
+        <div style="padding:12px 16px;">
+          <span style="display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:${CRITICO_BG[t.criticidad]};color:${CRITICO_COLOR[t.criticidad]};text-transform:uppercase;">${t.criticidad}</span>
+          ${t.garantia ? '<span style="margin-left:6px;font-size:11px;background:#e8f4fd;color:#1a5276;padding:3px 8px;border-radius:10px;font-weight:700;">En garantía</span>' : ''}
+          ${t.observaciones ? `<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 5px;">Observaciones</div><div style="font-size:13px;color:#333;line-height:1.6;white-space:pre-wrap;">${t.observaciones}</div>` : ''}
+          ${t.acciones ? `<div style="font-size:10px;font-weight:700;color:#2c2c2c;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 5px;">Acciones ejecutadas</div><div style="font-size:13px;color:#333;line-height:1.6;white-space:pre-wrap;background:#f0f7f0;padding:8px 12px;border-radius:6px;border-left:3px solid #27ae60;">${t.acciones}</div>` : ''}
+          ${t.fotos?.length > 0 ? `<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 8px;">Fotografías</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${t.fotos.map(f => `<img src="${f.data}" style="width:140px;height:105px;object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;" />`).join('')}</div>` : ''}
+        </div>
+      </div>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>${inf.numero} - ${inf.cliente}</title>
+<style>body{font-family:Arial,sans-serif;font-size:14px;margin:0;background:#f5f5f5;}@media print{body{background:white;}}</style>
+</head><body>
+<div style="background:#2c2c2c;color:white;padding:40px 36px 32px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;">
+    <div><div style="font-size:18px;font-weight:700;color:#e8b923;">Brimahd ltda.</div><div style="font-size:11px;color:rgba(255,255,255,0.6);">Servicios Eléctricos · ${cfg.rut}</div></div>
+    <div style="text-align:right;"><div style="font-size:12px;color:rgba(255,255,255,0.55);">${fechaFmt}</div><div style="font-size:14px;font-weight:700;color:#e8b923;margin-top:4px;">${inf.numero}</div></div>
+  </div>
+  <div style="font-size:24px;font-weight:700;line-height:1.2;margin-bottom:6px;">Informe de Mantención<br/>Preventiva de Tableros</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-bottom:22px;">Inspección y registro de observaciones</div>
+  <div style="background:rgba(255,255,255,0.08);border-left:4px solid #e8b923;padding:12px 16px;border-radius:4px;display:flex;flex-wrap:wrap;gap:12px 32px;">
+    <div><div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;margin-bottom:2px;">Cliente</div><div style="font-size:13px;font-weight:600;">${inf.cliente}</div></div>
+    ${inf.contacto ? `<div><div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;margin-bottom:2px;">Contacto</div><div style="font-size:13px;font-weight:600;">${inf.contacto}</div></div>` : ''}
+    ${inf.cartaGantt ? `<div><div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;margin-bottom:2px;">Próxima mantención</div><div style="font-size:13px;font-weight:600;">${inf.cartaGantt}</div></div>` : ''}
+  </div>
+</div>
+<div style="background:white;padding:28px 36px;">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:5px;margin-bottom:18px;">Resumen ejecutivo</div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:22px;">
+    <div style="background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;padding:12px;text-align:center;"><div style="font-size:26px;font-weight:700;color:#2c2c2c;">${inf.tableros.length}</div><div style="font-size:10px;color:#888;margin-top:3px;text-transform:uppercase;">Tableros inspeccionados</div></div>
+    <div style="background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;padding:12px;text-align:center;"><div style="font-size:26px;font-weight:700;color:#c0392b;">${criticos}</div><div style="font-size:10px;color:#888;margin-top:3px;text-transform:uppercase;">Observaciones críticas</div></div>
+    <div style="background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;padding:12px;text-align:center;"><div style="font-size:26px;font-weight:700;color:#d35400;">${atencion}</div><div style="font-size:10px;color:#888;margin-top:3px;text-transform:uppercase;">Atención prioritaria</div></div>
+    <div style="background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;padding:12px;text-align:center;"><div style="font-size:26px;font-weight:700;color:#1a5276;">${planif}</div><div style="font-size:10px;color:#888;margin-top:3px;text-transform:uppercase;">Planificados</div></div>
+  </div>
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:5px;margin-bottom:10px;">EPP</div>
+  <p style="font-size:13px;color:#555;margin-bottom:18px;line-height:1.6;">${cfg.epp}</p>
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:5px;margin-bottom:10px;">Personal de mantención</div>
+  <p style="font-size:13px;color:#555;margin-bottom:18px;">${inf.personal.filter(Boolean).join(' · ')}</p>
+  <div style="padding:12px 14px;background:#f8f8f8;border:1px solid #e8e8e8;border-radius:6px;">
+    <span style="font-size:11px;font-weight:700;color:#2c2c2c;text-transform:uppercase;">Condición: </span>
+    <span style="font-size:12px;color:#555;">${inf.condicion}</span>
+  </div>
+</div>
+<div style="background:white;padding:0 36px 36px;margin-top:8px;">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:5px;margin-bottom:18px;">Detalle por tablero</div>
+  ${tablerosHTML}
+</div>
+<div style="background:#2c2c2c;color:white;padding:20px 36px;display:flex;justify-content:space-between;align-items:center;">
+  <div><div style="font-size:14px;font-weight:700;color:#e8b923;">Brimahd ltda.</div><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;">${cfg.rut} · ${cfg.email}</div></div>
+  <div style="text-align:right;font-size:12px;color:rgba(255,255,255,0.75);">
+    <strong style="color:#e8b923;">${inf.numero}</strong><br/>
+    ${inf.personal.filter(Boolean).join(' · ')}<br/>
+    ${inf.cartaGantt ? `<span style="color:rgba(255,255,255,0.45);font-size:11px;">Próx. mantención: ${inf.cartaGantt}</span>` : ''}
+  </div>
+</div>
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${inf.numero} - ${inf.cliente}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   function compartirWhatsApp(informe, config, fechaFmt) {
@@ -387,46 +460,19 @@ export default function App() {
       <div style={s.app}>
         <div style={s.header}>
           <Logo size={32} withText={true} />
-          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => { setEnviarScreen(false); setPaso1Listo(false); }}>← Volver</button>
+          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setEnviarScreen(false)}>← Volver</button>
         </div>
         <div style={{ background: ACCENT, padding: "10px 18px" }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>📤 Enviar informe {informe.numero}</span>
         </div>
         <div style={s.body}>
-
-          {/* PASO 1 */}
-          <div style={{ ...s.card, border: paso1Listo ? "2px solid #27ae60" : "1px solid #e0e0e0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: paso1Listo ? "#27ae60" : ACCENT, color: paso1Listo ? "white" : PRIMARY, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-                {paso1Listo ? "✓" : "1"}
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: PRIMARY }}>Guarda el PDF en tu celular</div>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Necesitarás el archivo para adjuntarlo al enviar</div>
-              </div>
+          <div style={{ ...s.card, background: "#fff9ec", border: "1px solid #ffe082", marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: "#7c5800", lineHeight: 1.6 }}>
+              💡 Asegúrate de haber descargado el informe antes de continuar para poder adjuntarlo.
             </div>
-            <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", marginBottom: 10 }} onClick={() => { setEnviarScreen(false); setTimeout(() => imprimirPDF(informe), 300); }}>
-              🖨 Guardar / Imprimir PDF
-            </button>
-            {!paso1Listo && (
-              <button style={{ ...s.btnGhost, width: "100%", fontSize: 13 }} onClick={() => setPaso1Listo(true)}>
-                ✓ Ya guardé el PDF
-              </button>
-            )}
-            {paso1Listo && (
-              <div style={{ textAlign: "center", fontSize: 13, color: "#27ae60", fontWeight: 700 }}>✓ PDF guardado</div>
-            )}
           </div>
-
-          {/* PASO 2 */}
-          <div style={{ ...s.card, opacity: paso1Listo ? 1 : 0.4, pointerEvents: paso1Listo ? "auto" : "none" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: paso1Listo ? ACCENT : "#e0e0e0", color: paso1Listo ? PRIMARY : "#aaa", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>2</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: PRIMARY }}>Elige cómo enviar</div>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Adjunta el PDF guardado en el mensaje</div>
-              </div>
-            </div>
+          <div style={s.card}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: PRIMARY, marginBottom: 14 }}>Elige cómo enviar</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button style={{ ...s.btn, background: "#25D366", color: "white", width: "100%", padding: 13, fontSize: 14 }}
                 onClick={() => compartirWhatsApp(informe, config, fechaFmt)}>
@@ -438,11 +484,6 @@ export default function App() {
               </button>
             </div>
           </div>
-
-          <div style={{ padding: "12px 14px", background: "#fff9ec", border: "1px solid #ffe082", borderRadius: 8, fontSize: 12, color: "#7c5800", lineHeight: 1.6 }}>
-            💡 <strong>Recuerda:</strong> una vez abierto WhatsApp o el correo, adjunta manualmente el PDF que guardaste en el paso 1.
-          </div>
-
         </div>
       </div>
     );
@@ -460,11 +501,11 @@ export default function App() {
         <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }} className="no-print">
           <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={() => { setEnviarScreen(true); setPaso1Listo(false); }}>
-              📤 Enviar informe
+            <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px" }} onClick={() => descargarHTML(informe, config)}>
+              ⬇ Descargar informe
             </button>
-            <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 12px" }} onClick={() => imprimirPDF(informe)}>
-              🖨 PDF
+            <button style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={() => { setEnviarScreen(true); }}>
+              📤 Enviar
             </button>
           </div>
         </div>
