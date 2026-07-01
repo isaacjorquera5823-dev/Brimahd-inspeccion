@@ -242,9 +242,9 @@ export default function App() {
   function descargarHTML(inf, cfg) {
     const fechaFmt = new Date(inf.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
     const totalRegistros = inf.tableros.reduce((s,t) => s + (t.registros?.length||0), 0);
-    const criticas = inf.tableros.filter(t => t.criticidad === "Crítica").length;
-    const medias   = inf.tableros.filter(t => t.criticidad === "Media").length;
-    const leves    = inf.tableros.filter(t => t.criticidad === "Leve").length;
+    const criticas = inf.tableros.reduce((s,t) => s + (t.registros||[]).reduce((s2,r) => s2 + r.observaciones.filter(o=>o.criticidad==="Crítica").length, 0), 0);
+    const medias   = inf.tableros.reduce((s,t) => s + (t.registros||[]).reduce((s2,r) => s2 + r.observaciones.filter(o=>o.criticidad==="Media").length, 0), 0);
+    const leves    = inf.tableros.reduce((s,t) => s + (t.registros||[]).reduce((s2,r) => s2 + r.observaciones.filter(o=>o.criticidad==="Leve").length, 0), 0);
     const cambios  = inf.tableros.reduce((s,t) => s + (t.registros?.filter(r=>r.cambioTablero).length||0), 0);
 
     // Tabla de observaciones críticas detallada
@@ -367,15 +367,15 @@ export default function App() {
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
     <div style="background:#c0392b;border-radius:8px;padding:14px;text-align:center;">
       <div style="font-size:30px;font-weight:700;color:white;">${criticas}</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.8);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;">Crítica</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.8);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;">Obs. Críticas</div>
     </div>
     <div style="background:#f39c12;border-radius:8px;padding:14px;text-align:center;">
       <div style="font-size:30px;font-weight:700;color:#7a3800;">${medias}</div>
-      <div style="font-size:10px;color:#7a3800;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Media</div>
+      <div style="font-size:10px;color:#7a3800;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Obs. Media</div>
     </div>
     <div style="background:#7fb3c8;border-radius:8px;padding:14px;text-align:center;">
       <div style="font-size:30px;font-weight:700;color:#1a3a45;">${leves}</div>
-      <div style="font-size:10px;color:#1a3a45;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Leve</div>
+      <div style="font-size:10px;color:#1a3a45;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Obs. Leve</div>
     </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
@@ -412,7 +412,7 @@ ${criticasRows.length > 0 ? `
       </tr>
     </thead>
     <tbody>
-      ${criticasRows}
+      ${criticasRows.join('')}
     </tbody>
   </table>
 </div>` : ''}
@@ -465,9 +465,18 @@ ${criticasRows.length > 0 ? `
       });
     });
 
-    const seccionCriticas = criticas.length > 0
-      ? `\n⚠ OBSERVACIONES CRÍTICAS (${criticas.length}):\n${"─".repeat(40)}\n${criticas.join("\n")}\n${"─".repeat(40)}\n\nEstas observaciones requieren atención prioritaria. Se recomienda gestionar su corrección en el corto plazo para evitar riesgos a la instalación y a las personas.\n`
-      : "";
+    const seccionCriticas = criticas.length > 0 ? (() => {
+      const col1 = 28, col2 = 8, col3 = 45;
+      const pad = (str, len) => str.length > len ? str.slice(0, len - 1) + "…" : str.padEnd(len);
+      const sep = "─".repeat(col1) + "─┼─" + "─".repeat(col2) + "─┼─" + "─".repeat(col3);
+      const header = pad("Tablero", col1) + " │ " + pad("Registro", col2) + " │ " + pad("Observación", col3);
+      const rows = criticas.map(c => {
+        const parts = c.match(/^\s+•\s+\[(.+?)\s+\/\s+Registro N°(\d+)\]\s+(.+)$/);
+        if (!parts) return c;
+        return pad(parts[1], col1) + " │ " + pad("N° " + parts[2], col2) + " │ " + parts[3];
+      });
+      return `\n⚠ OBSERVACIONES CRÍTICAS (${criticas.length}):\n${sep}\n${header}\n${sep}\n${rows.join("\n")}\n${sep}\n\nEstas observaciones requieren atención prioritaria. Se recomienda gestionar su corrección en el corto plazo.\n`;
+    })() : "";
 
     const cuerpo = `Estimado/a Sr./Sra. ${inf.contacto || ""},\n\nJunto con saludar, adjunto el informe de mantención preventiva de tableros eléctricos correspondiente a:\n\nCliente: ${inf.cliente}\nFecha: ${fechaFmt}\nN° Informe: ${inf.numero}\nTableros inspeccionados: ${inf.tableros.length}\nPersonal: ${inf.personal.filter(Boolean).join(", ")}\n${inf.cartaGantt ? "Próxima mantención: "+inf.cartaGantt+"\n" : ""}${seccionCriticas}\nEl detalle completo con fotografías y observaciones se encuentra en el archivo adjunto.\n\nQuedamos a su disposición ante cualquier consulta.\n\nSaludos cordiales,\n${cfg.empresa}\n${cfg.rut}\n${cfg.email}`;
 
