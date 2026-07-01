@@ -119,103 +119,6 @@ function Logo({ size = 36, withText = true }) {
 }
 
 
-function RegistroCard({ reg, regIdx, obsSearch, setObsSearch, obsFocused, setObsFocused,
-  obsFiltradas, addObsToRegistro, removeObsFromRegistro, handleRegistroFoto,
-  removeRegistro, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER, s, PRIMARY, tableroEdit, setTableroEdit, FONT }) {
-
-  const [localSearch, setLocalSearch] = useState("");
-  const [localFocused, setLocalFocused] = useState(false);
-  const fileInputRef = useRef();
-  const filtered = obsFiltradas(localSearch);
-
-  return (
-    <div style={{ border: "1px solid #e0e0e0", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
-      {/* Header del registro */}
-      <div style={{ background: PRIMARY, color: "white", padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 13, fontWeight: 700 }}>Registro N° {regIdx + 1}</span>
-        <button onClick={() => removeRegistro(regIdx)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>Eliminar</button>
-      </div>
-
-      <div style={{ padding: "14px" }}>
-        {/* Foto */}
-        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
-          onChange={e => handleRegistroFoto(e, regIdx)} />
-        {reg.foto ? (
-          <div style={{ position: "relative", marginBottom: 12 }}>
-            <img src={reg.foto.data} alt="registro" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8, border: "1px solid #e0e0e0" }} />
-            <button onClick={() => fileInputRef.current.click()}
-              style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
-              📷 Cambiar foto
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => fileInputRef.current.click()}
-            style={{ ...s.btnGhost, width: "100%", marginBottom: 12, padding: "20px", border: "2px dashed #e0e0e0", borderRadius: 8, fontSize: 13, color: "#888" }}>
-            📷 Tomar foto (obligatorio)
-          </button>
-        )}
-
-        {/* Buscador de observaciones */}
-        <label style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6, display: "block", fontFamily: FONT }}>Agregar observación</label>
-        <div style={{ position: "relative", marginBottom: 8 }}>
-          <input
-            style={{ ...s.input, marginBottom: 0 }}
-            value={localSearch}
-            onChange={e => setLocalSearch(e.target.value)}
-            onFocus={() => setLocalFocused(true)}
-            onBlur={() => setTimeout(() => setLocalFocused(false), 150)}
-            placeholder="Buscar observación…"
-          />
-          {localFocused && filtered.length > 0 && (
-            <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "white", border: "1px solid #e0e0e0", borderRadius: 7, zIndex: 999, maxHeight: 260, overflowY: "auto", boxShadow: "0 -4px 20px rgba(0,0,0,0.15)", marginBottom: 4 }}>
-              {filtered.map((obs, i) => (
-                <div key={i}
-                  onMouseDown={() => { addObsToRegistro(regIdx, obs); setLocalSearch(""); }}
-                  style={{ padding: "9px 13px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#f8f8f8"}
-                  onMouseLeave={e => e.currentTarget.style.background = "white"}>
-                  <span style={{ fontSize: 13, color: PRIMARY, flex: 1, lineHeight: 1.4 }}>{obs.texto}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10, background: CRITICO_BG[obs.criticidad], color: CRITICO_COLOR[obs.criticidad], marginLeft: 8, whiteSpace: "nowrap", border: `1px solid ${CRITICO_BORDER[obs.criticidad]}` }}>{obs.criticidad}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Observaciones del registro */}
-        {reg.observaciones.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {reg.observaciones.map((obs, oi) => (
-              <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: CRITICO_BG[obs.criticidad], border: `1px solid ${CRITICO_BORDER[obs.criticidad]}`, borderRadius: 7, padding: "7px 10px" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
-                <span style={{ flex: 1, fontSize: 12, color: CRITICO_COLOR[obs.criticidad], lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap", opacity: 0.85 }}>{obs.criticidad}</span>
-                <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: CRITICO_COLOR[obs.criticidad], fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.7 }}>✕</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Cambio de tablero — toggle */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, padding: "10px 12px", background: reg.cambioTablero ? "#fde8e8" : "#f8f8f8", border: `1px solid ${reg.cambioTablero ? "#c0392b" : "#e0e0e0"}`, borderRadius: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: reg.cambioTablero ? 700 : 400, color: reg.cambioTablero ? "#c0392b" : "#555" }}>
-            Se recomienda cambio de tablero
-          </span>
-          <button
-            onClick={() => {
-              const regs = [...tableroEdit.registros];
-              regs[regIdx] = { ...reg, cambioTablero: !reg.cambioTablero };
-              setTableroEdit(p => ({ ...p, registros: regs }));
-            }}
-            style={{ width: 52, height: 28, borderRadius: 14, background: reg.cambioTablero ? "#c0392b" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
-            <div style={{ position: "absolute", top: 4, left: reg.cambioTablero ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   const [screen, setScreen] = useState("inicio");
   const [config, setConfig] = useLocalStorage("brimahd_config", defaultConfig);
@@ -226,9 +129,9 @@ export default function App() {
   const [enviarScreen, setEnviarScreen] = useState(false);
   const [sedeSearch, setSedeSearch] = useState("");
   const [sedeFocused, setSedeFocused] = useState(false);
-  const [obsSearch, setObsSearch] = useState("");
-  const [obsFocused, setObsFocused] = useState(false);
-  const fileRef = useRef();
+  const [obsSearch, setObsSearch] = useState([]);
+  const [obsFocused, setObsFocused] = useState([]);
+  const fileRef = useRef({});
 
   const numInforme = `INF-${String(counter).padStart(4,"0")}`;
 
@@ -721,11 +624,6 @@ ${criticasRows.length > 0 ? `
 
   if (screen === "tablero" && tableroEdit) {
   // Per-registro obs search state (one per registro)
-  const obsFiltradas = (search) => OBSERVACIONES_PREDEFINIDAS.filter(o =>
-    o.texto.toLowerCase().includes((search || "").toLowerCase())
-  );
-
-  // fileInputRefs per registro — use a map keyed by registro id
   return (
     <div style={s.app}>
       <div style={s.header}>
@@ -763,30 +661,83 @@ ${criticasRows.length > 0 ? `
         {/* ── Registros ── */}
         <div style={s.sectionTitle}>Registros</div>
 
-        {tableroEdit.registros.map((reg, regIdx) => (
-          <RegistroCard
-            key={reg.id}
-            reg={reg}
-            regIdx={regIdx}
-            obsSearch={obsSearch}
-            setObsSearch={setObsSearch}
-            obsFocused={obsFocused}
-            setObsFocused={setObsFocused}
-            obsFiltradas={obsFiltradas}
-            addObsToRegistro={addObsToRegistro}
-            removeObsFromRegistro={removeObsFromRegistro}
-            handleRegistroFoto={handleRegistroFoto}
-            removeRegistro={removeRegistro}
-            CRITICO_COLOR={CRITICO_COLOR}
-            CRITICO_BG={CRITICO_BG}
-            CRITICO_BORDER={CRITICO_BORDER}
-            s={s}
-            PRIMARY={PRIMARY}
-            tableroEdit={tableroEdit}
-            setTableroEdit={setTableroEdit}
-            FONT={FONT}
-          />
-        ))}
+        {tableroEdit.registros.map((reg, regIdx) => {
+          const regSearch = obsSearch[regIdx] || "";
+          const regFocused = obsFocused[regIdx] || false;
+          const regFiltered = OBSERVACIONES_PREDEFINIDAS.filter(o =>
+            o.texto.toLowerCase().includes(regSearch.toLowerCase())
+          );
+          return (
+            <div key={reg.id} style={{ border: "1px solid #e0e0e0", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
+              <div style={{ background: PRIMARY, color: "white", padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Registro N° {regIdx + 1}</span>
+                <button onClick={() => removeRegistro(regIdx)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>Eliminar</button>
+              </div>
+              <div style={{ padding: "14px" }}>
+                <input ref={el => { if (!fileRef.current) fileRef.current = {}; fileRef.current[regIdx] = el; }} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+                  onChange={e => handleRegistroFoto(e, regIdx)} />
+                {reg.foto ? (
+                  <div style={{ position: "relative", marginBottom: 12 }}>
+                    <img src={reg.foto.data} alt="registro" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8, border: "1px solid #e0e0e0" }} />
+                    <button onClick={() => fileRef.current[regIdx]?.click()}
+                      style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
+                      📷 Cambiar foto
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => fileRef.current[regIdx]?.click()}
+                    style={{ ...s.btnGhost, width: "100%", marginBottom: 12, padding: "20px", border: "2px dashed #e0e0e0", borderRadius: 8, fontSize: 13, color: "#888" }}>
+                    📷 Tomar foto (obligatorio)
+                  </button>
+                )}
+                <label style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6, display: "block", fontFamily: FONT }}>Agregar observación</label>
+                <div style={{ position: "relative", marginBottom: 8 }}>
+                  <input
+                    style={{ ...s.input, marginBottom: 0 }}
+                    value={regSearch}
+                    onChange={e => setObsSearch(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
+                    onFocus={() => setObsFocused(p => { const a = [...p]; a[regIdx] = true; return a; })}
+                    onBlur={() => setTimeout(() => setObsFocused(p => { const a = [...p]; a[regIdx] = false; return a; }), 150)}
+                    placeholder="Buscar observación…"
+                  />
+                  {regFocused && regFiltered.length > 0 && (
+                    <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "white", border: "1px solid #e0e0e0", borderRadius: 7, zIndex: 999, maxHeight: 260, overflowY: "auto", boxShadow: "0 -4px 20px rgba(0,0,0,0.15)", marginBottom: 4 }}>
+                      {regFiltered.map((obs, i) => (
+                        <div key={i}
+                          onMouseDown={() => { addObsToRegistro(regIdx, obs); setObsSearch(p => { const a = [...p]; a[regIdx] = ""; return a; }); }}
+                          style={{ padding: "9px 13px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                          onMouseEnter={e => e.currentTarget.style.background = "#f8f8f8"}
+                          onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                          <span style={{ fontSize: 13, color: PRIMARY, flex: 1, lineHeight: 1.4 }}>{obs.texto}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10, background: CRITICO_BG[obs.criticidad], color: CRITICO_COLOR[obs.criticidad], marginLeft: 8, whiteSpace: "nowrap", border: `1px solid ${CRITICO_BORDER[obs.criticidad]}` }}>{obs.criticidad}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {reg.observaciones.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
+                    {reg.observaciones.map((obs, oi) => (
+                      <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: CRITICO_BG[obs.criticidad], border: `1px solid ${CRITICO_BORDER[obs.criticidad]}`, borderRadius: 7, padding: "7px 10px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
+                        <span style={{ flex: 1, fontSize: 12, color: CRITICO_COLOR[obs.criticidad], lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap", opacity: 0.85 }}>{obs.criticidad}</span>
+                        <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: CRITICO_COLOR[obs.criticidad], fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.7 }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "10px 12px", background: reg.cambioTablero ? "#fde8e8" : "#f8f8f8", border: `1px solid ${reg.cambioTablero ? "#c0392b" : "#e0e0e0"}`, borderRadius: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: reg.cambioTablero ? 700 : 400, color: reg.cambioTablero ? "#c0392b" : "#555" }}>Se recomienda cambio de tablero</span>
+                  <button onClick={() => { const regs = [...tableroEdit.registros]; regs[regIdx] = { ...reg, cambioTablero: !reg.cambioTablero }; setTableroEdit(p => ({ ...p, registros: regs })); }}
+                    style={{ width: 52, height: 28, borderRadius: 14, background: reg.cambioTablero ? "#c0392b" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+                    <div style={{ position: "absolute", top: 4, left: reg.cambioTablero ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
         <button style={{ ...s.btn, ...s.btnAccent, width: "100%", marginBottom: 12 }} onClick={addRegistro}>
           + Agregar registro
