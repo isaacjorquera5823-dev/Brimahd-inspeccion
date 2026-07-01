@@ -121,7 +121,7 @@ function Logo({ size = 36, withText = true }) {
 
 function RegistroCard({ reg, regIdx, obsSearch, setObsSearch, obsFocused, setObsFocused,
   obsFiltradas, addObsToRegistro, removeObsFromRegistro, handleRegistroFoto,
-  removeRegistro, CRITICO_COLOR, CRITICO_BG, s, PRIMARY }) {
+  removeRegistro, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER, s, PRIMARY, tableroEdit, setTableroEdit, FONT }) {
 
   const [localSearch, setLocalSearch] = React.useState("");
   const [localFocused, setLocalFocused] = React.useState(false);
@@ -408,6 +408,7 @@ export default function App() {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${inf.numero} — ${inf.cliente}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -571,7 +572,7 @@ ${criticasRows.length > 0 ? `
   }
 
   const s = {
-    app: { fontFamily: FONT, fontSize: 14, maxWidth: 480, margin: "0 auto", background: BG, minHeight: "100vh" },
+    app: { fontFamily: FONT, fontSize: 14, maxWidth: 480, margin: "0 auto", background: BG, minHeight: "100vh", width: "100%" },
     header: { background: PRIMARY, color: "white", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" },
     body: { padding: "16px" },
     card: { background: "white", borderRadius: 10, border: "1px solid #e0e0e0", padding: "14px 16px", marginBottom: 12 },
@@ -778,8 +779,12 @@ ${criticasRows.length > 0 ? `
             removeRegistro={removeRegistro}
             CRITICO_COLOR={CRITICO_COLOR}
             CRITICO_BG={CRITICO_BG}
+            CRITICO_BORDER={CRITICO_BORDER}
             s={s}
             PRIMARY={PRIMARY}
+            tableroEdit={tableroEdit}
+            setTableroEdit={setTableroEdit}
+            FONT={FONT}
           />
         ))}
 
