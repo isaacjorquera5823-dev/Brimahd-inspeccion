@@ -131,6 +131,7 @@ export default function App() {
   const [sedeFocused, setSedeFocused] = useState(false);
   const [obsSearch, setObsSearch] = useState([]);
   const [obsFocused, setObsFocused] = useState([]);
+  const [obsPicker, setObsPicker] = useState(null); // { regIdx } when picker is open
   const fileRef = useRef({});
 
   const numInforme = `INF-${String(counter).padStart(4,"0")}`;
@@ -465,18 +466,13 @@ ${criticasRows.length > 0 ? `
       });
     });
 
-    const seccionCriticas = criticas.length > 0 ? (() => {
-      const col1 = 28, col2 = 8, col3 = 45;
-      const pad = (str, len) => str.length > len ? str.slice(0, len - 1) + "…" : str.padEnd(len);
-      const sep = "─".repeat(col1) + "─┼─" + "─".repeat(col2) + "─┼─" + "─".repeat(col3);
-      const header = pad("Tablero", col1) + " │ " + pad("Registro", col2) + " │ " + pad("Observación", col3);
-      const rows = criticas.map(c => {
-        const parts = c.match(/^\s+•\s+\[(.+?)\s+\/\s+Registro N°(\d+)\]\s+(.+)$/);
-        if (!parts) return c;
-        return pad(parts[1], col1) + " │ " + pad("N° " + parts[2], col2) + " │ " + parts[3];
-      });
-      return `\n⚠ OBSERVACIONES CRÍTICAS (${criticas.length}):\n${sep}\n${header}\n${sep}\n${rows.join("\n")}\n${sep}\n\nEstas observaciones requieren atención prioritaria. Se recomienda gestionar su corrección en el corto plazo.\n`;
-    })() : "";
+    const seccionCriticas = criticas.length > 0
+      ? `\n⚠ OBSERVACIONES CRÍTICAS (${criticas.length}):\n\n${criticas.map((c, i) => {
+          const parts = c.match(/^\s+•\s+\[(.+?)\s+\/\s+Registro N°(\d+)\]\s+(.+)$/);
+          if (!parts) return c;
+          return `${i+1}. ${parts[1]} | Registro N°${parts[2]}\n   ${parts[3]}`;
+        }).join("\n\n")}\n\nEstas observaciones requieren atención prioritaria. Se recomienda gestionar su corrección en el corto plazo para evitar riesgos a la instalación y a las personas.\n`
+      : "";
 
     const cuerpo = `Estimado/a Sr./Sra. ${inf.contacto || ""},\n\nJunto con saludar, adjunto el informe de mantención preventiva de tableros eléctricos correspondiente a:\n\nCliente: ${inf.cliente}\nFecha: ${fechaFmt}\nN° Informe: ${inf.numero}\nTableros inspeccionados: ${inf.tableros.length}\nPersonal: ${inf.personal.filter(Boolean).join(", ")}\n${inf.cartaGantt ? "Próxima mantención: "+inf.cartaGantt+"\n" : ""}${seccionCriticas}\nEl detalle completo con fotografías y observaciones se encuentra en el archivo adjunto.\n\nQuedamos a su disposición ante cualquier consulta.\n\nSaludos cordiales,\n${cfg.empresa}\n${cfg.rut}\n${cfg.email}`;
 
@@ -489,7 +485,8 @@ ${criticasRows.length > 0 ? `
     body: { padding: "16px" },
     card: { background: "white", borderRadius: 10, border: "1px solid #e0e0e0", padding: "14px 16px", marginBottom: 12 },
     label: { fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "block", fontFamily: FONT },
-    input: { width: "100%", padding: "9px 11px", border: "1px solid #e0e0e0", borderRadius: 7, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none" },
+    input: { width: "100%", padding: "9px 11px", border: "1px solid #e0e0e0", borderRadius: 7, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: "#222" },
+    select: { width: "100%", padding: "9px 11px", border: "1px solid #e0e0e0", borderRadius: 7, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: "#222", background: "white" },
     textarea: { width: "100%", padding: "9px 11px", border: "1px solid #e0e0e0", borderRadius: 7, fontSize: 16, boxSizing: "border-box", marginBottom: 6, minHeight: 80, resize: "vertical", fontFamily: FONT },
     btn: { padding: "10px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: FONT },
     btnPrimary: { background: PRIMARY, color: "white" },
@@ -563,7 +560,7 @@ ${criticasRows.length > 0 ? `
           <div style={s.sectionTitle}>Cliente</div>
           <label style={s.label}>Sede</label>
           <select
-            style={s.input}
+            style={s.select}
             value={informe.cliente}
             onChange={e => {
               const sede = SEDES.find(s => s.nombre === e.target.value);
@@ -587,7 +584,7 @@ ${criticasRows.length > 0 ? `
           <div style={s.sectionTitle}>Personal en terreno</div>
           {informe.personal.map((p, i) => (
             <div key={i} style={{ ...s.row, marginBottom: 8 }}>
-              <select style={{ ...s.input, marginBottom: 0, flex: 1 }} value={p} onChange={e => updatePersonal(i, e.target.value)}>
+              <select style={{ ...s.select, marginBottom: 0, flex: 1 }} value={p} onChange={e => updatePersonal(i, e.target.value)}>
                 <option value="">— Seleccionar técnico —</option>
                 {TECNICOS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -632,7 +629,71 @@ ${criticasRows.length > 0 ? `
   );
 
   if (screen === "tablero" && tableroEdit) {
-  // Per-registro obs search state (one per registro)
+
+  // ── Picker de observaciones ──
+  if (obsPicker !== null) {
+    const regIdx = obsPicker.regIdx;
+    const regSearch = obsSearch[regIdx] || "";
+    const regFiltered = OBSERVACIONES_PREDEFINIDAS.filter(o =>
+      o.texto.toLowerCase().includes(regSearch.toLowerCase())
+    );
+    const reg = tableroEdit.registros[regIdx];
+    return (
+      <div style={s.app}>
+        <div style={s.header}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
+          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }}
+            onClick={() => setObsPicker(null)}>← Volver</button>
+        </div>
+        <div style={{ background: ACCENT, padding: "10px 18px" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>Registro N° {regIdx + 1} — Observaciones</span>
+        </div>
+        <div style={s.body}>
+          <input
+            style={{ ...s.input }}
+            value={regSearch}
+            onChange={e => setObsSearch(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
+            placeholder="Buscar observación…"
+          />
+          <div style={{ background: "white", borderRadius: 10, border: "1px solid #e0e0e0", overflow: "hidden", marginBottom: 12 }}>
+            {regFiltered.length === 0 && (
+              <div style={{ padding: "16px", textAlign: "center", color: "#aaa", fontSize: 13 }}>Sin resultados</div>
+            )}
+            {regFiltered.map((obs, i) => {
+              const already = reg.observaciones.some(o => o.texto === obs.texto);
+              return (
+                <div key={i}
+                  onClick={() => { if (!already) addObsToRegistro(regIdx, obs); }}
+                  style={{ padding: "12px 14px", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: already ? "#f8f8f8" : "white", opacity: already ? 0.5 : 1, cursor: already ? "default" : "pointer" }}>
+                  <span style={{ flex: 1, fontSize: 13, color: PRIMARY, lineHeight: 1.4 }}>{obs.texto}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10, background: CRITICO_BG[obs.criticidad], color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap", border: `1px solid ${CRITICO_BORDER[obs.criticidad]}` }}>
+                    {already ? "✓" : obs.criticidad}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {reg.observaciones.length > 0 && (
+            <div style={s.card}>
+              <div style={s.sectionTitle}>Seleccionadas ({reg.observaciones.length})</div>
+              {reg.observaciones.map((obs, oi) => (
+                <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: CRITICO_BG[obs.criticidad], border: `1px solid ${CRITICO_BORDER[obs.criticidad]}`, borderRadius: 7, padding: "7px 10px", marginBottom: 5 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
+                  <span style={{ flex: 1, fontSize: 12, color: CRITICO_COLOR[obs.criticidad], lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
+                  <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: CRITICO_COLOR[obs.criticidad], fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.7 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 14 }} onClick={() => setObsPicker(null)}>
+            Confirmar observaciones →
+          </button>
+          <div style={{ height: 20 }} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={s.app}>
       <div style={s.header}>
@@ -648,7 +709,7 @@ ${criticasRows.length > 0 ? `
         <div style={s.card}>
           <div style={s.sectionTitle}>Identificación</div>
           <label style={s.label}>Ubicación</label>
-          <select style={s.input} value={tableroEdit.ubicacion} onChange={e => setTableroEdit(p => ({ ...p, ubicacion: e.target.value, numeroSala: "" }))}>
+          <select style={s.select} value={tableroEdit.ubicacion} onChange={e => setTableroEdit(p => ({ ...p, ubicacion: e.target.value, numeroSala: "" }))}>
             {UBICACIONES.map(u => <option key={u}>{u}</option>)}
           </select>
           {tableroEdit.ubicacion === "Sala" && (
@@ -658,7 +719,7 @@ ${criticasRows.length > 0 ? `
             </>
           )}
           <label style={s.label}>Piso</label>
-          <select style={s.input} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
+          <select style={s.select} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
             {PISOS.map(p => <option key={p}>{p}</option>)}
           </select>
           <div style={{ ...s.row, marginTop: 4 }}>
@@ -671,11 +732,6 @@ ${criticasRows.length > 0 ? `
         <div style={s.sectionTitle}>Registros</div>
 
         {tableroEdit.registros.map((reg, regIdx) => {
-          const regSearch = obsSearch[regIdx] || "";
-          const regFocused = obsFocused[regIdx] || false;
-          const regFiltered = OBSERVACIONES_PREDEFINIDAS.filter(o =>
-            o.texto.toLowerCase().includes(regSearch.toLowerCase())
-          );
           return (
             <div key={reg.id} style={{ border: "1px solid #e0e0e0", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
               <div style={{ background: PRIMARY, color: "white", padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -699,31 +755,14 @@ ${criticasRows.length > 0 ? `
                     📷 Tomar foto (obligatorio)
                   </button>
                 )}
-                <label style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6, display: "block", fontFamily: FONT }}>Agregar observación</label>
-                <div style={{ position: "relative", marginBottom: 8 }}>
-                  <input
-                    style={{ ...s.input, marginBottom: 0 }}
-                    value={regSearch}
-                    onChange={e => setObsSearch(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
-                    onFocus={() => setObsFocused(p => { const a = [...p]; a[regIdx] = true; return a; })}
-                    onBlur={() => setTimeout(() => setObsFocused(p => { const a = [...p]; a[regIdx] = false; return a; }), 150)}
-                    placeholder="Buscar observación…"
-                  />
-                  {regFocused && regFiltered.length > 0 && (
-                    <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "white", border: "1px solid #e0e0e0", borderRadius: 7, zIndex: 999, maxHeight: 260, overflowY: "auto", boxShadow: "0 -4px 20px rgba(0,0,0,0.15)", marginBottom: 4 }}>
-                      {regFiltered.map((obs, i) => (
-                        <div key={i}
-                          onMouseDown={() => { addObsToRegistro(regIdx, obs); setObsSearch(p => { const a = [...p]; a[regIdx] = ""; return a; }); }}
-                          style={{ padding: "9px 13px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "#f8f8f8"}
-                          onMouseLeave={e => e.currentTarget.style.background = "white"}>
-                          <span style={{ fontSize: 13, color: PRIMARY, flex: 1, lineHeight: 1.4 }}>{obs.texto}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10, background: CRITICO_BG[obs.criticidad], color: CRITICO_COLOR[obs.criticidad], marginLeft: 8, whiteSpace: "nowrap", border: `1px solid ${CRITICO_BORDER[obs.criticidad]}` }}>{obs.criticidad}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <button
+                  onClick={() => setObsPicker({ regIdx })}
+                  style={{ ...s.btnGhost, width: "100%", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px" }}>
+                  <span style={{ fontSize: 13, color: reg.observaciones.length > 0 ? PRIMARY : "#aaa" }}>
+                    {reg.observaciones.length > 0 ? `${reg.observaciones.length} observación${reg.observaciones.length > 1 ? "es" : ""} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones…"}
+                  </span>
+                  <span style={{ fontSize: 12, color: "#aaa" }}>›</span>
+                </button>
                 {reg.observaciones.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
                     {reg.observaciones.map((obs, oi) => (
