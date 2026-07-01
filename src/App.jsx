@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 
 const PRIMARY = "#2c2c2c";
 const ACCENT = "#e8b923";
@@ -123,9 +123,9 @@ function RegistroCard({ reg, regIdx, obsSearch, setObsSearch, obsFocused, setObs
   obsFiltradas, addObsToRegistro, removeObsFromRegistro, handleRegistroFoto,
   removeRegistro, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER, s, PRIMARY, tableroEdit, setTableroEdit, FONT }) {
 
-  const [localSearch, setLocalSearch] = React.useState("");
-  const [localFocused, setLocalFocused] = React.useState(false);
-  const fileInputRef = React.useRef();
+  const [localSearch, setLocalSearch] = useState("");
+  const [localFocused, setLocalFocused] = useState(false);
+  const fileInputRef = useRef();
   const filtered = obsFiltradas(localSearch);
 
   return (
