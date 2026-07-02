@@ -801,7 +801,7 @@ ${criticasRows.length > 0 ? `
             {PISOS.map(p => <option key={p}>{p}</option>)}
           </select>
           <div style={{ ...s.row, marginTop: 4 }}>
-            <input type="checkbox" id="garantia" checked={tableroEdit.garantia} onChange={e => setTableroEdit(p => ({ ...p, garantia: e.target.checked }))} />
+            <input type="checkbox" id="garantia" checked={tableroEdit.garantia} onChange={e => setTableroEdit(p => ({ ...p, garantia: e.target.checked }))} style={{ width: 18, height: 18, minWidth: 18, accentColor: PRIMARY, cursor: "pointer" }} />
             <label htmlFor="garantia" style={{ fontSize: 13, color: "#333", cursor: "pointer" }}>Tablero en garantía</label>
           </div>
         </div>
