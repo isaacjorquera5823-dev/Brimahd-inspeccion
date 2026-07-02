@@ -81,7 +81,7 @@ const defaultConfig = {
 
 const defaultInforme = {
   cliente: "", contacto: "", direccion: "", fecha: new Date().toISOString().slice(0,10),
-  personal: [""], condicion: "Continuar con el servicio y eliminar de manera paulatina las observaciones.",
+  personal: [""],
   cartaGantt: "", tableros: [],
 };
 
@@ -290,7 +290,7 @@ export default function App() {
     }
   }
 
-  function descargarHTML(inf, cfg) {
+  function generarHTMLInforme(inf, cfg) {
     const fechaFmt = new Date(inf.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
     const totalRegistros = inf.tableros.reduce((s,t) => s + (t.registros?.length||0), 0);
     const criticas = inf.tableros.reduce((s,t) => s + (t.registros||[]).reduce((s2,r) => s2 + r.observaciones.filter(o=>o.criticidad==="Crítica").length, 0), 0);
@@ -484,6 +484,11 @@ ${criticasRows.length > 0 ? `
 
 </body></html>`;
 
+    return html;
+  }
+
+  function descargarHTML(inf, cfg) {
+    const html = generarHTMLInforme(inf, cfg);
     const fechaStr = new Date(inf.fecha + "T12:00:00").toISOString().slice(0,10).replace(/-/g,'');
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const reader = new FileReader();
@@ -796,9 +801,12 @@ ${criticasRows.length > 0 ? `
           <select style={s.select} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
             {PISOS.map(p => <option key={p}>{p}</option>)}
           </select>
-          <div style={{ ...s.row, marginTop: 4 }}>
-            <input type="checkbox" id="garantia" checked={tableroEdit.garantia} onChange={e => setTableroEdit(p => ({ ...p, garantia: e.target.checked }))} style={{ width: 18, height: 18, minWidth: 18, accentColor: PRIMARY, cursor: "pointer" }} />
-            <label htmlFor="garantia" style={{ fontSize: 13, color: "#333", cursor: "pointer" }}>Tablero en garantía</label>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? "#e8f4fd" : "#f8f8f8", border: `1px solid ${tableroEdit.garantia ? "#1a5276" : "#e0e0e0"}`, borderRadius: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? "#1a5276" : "#555" }}>Tablero en garantía</span>
+            <button onClick={() => setTableroEdit(p => ({ ...p, garantia: !p.garantia }))}
+              style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? "#1a5276" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+              <div style={{ position: "absolute", top: 4, left: tableroEdit.garantia ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
+            </button>
           </div>
         </div>
 
@@ -908,123 +916,17 @@ ${criticasRows.length > 0 ? `
   }
 
   if (screen === "preview" && informe) {
-    const criticos = informe.tableros.filter(t => t.criticidad === "Crítico").length;
-    const atencion = informe.tableros.filter(t => t.criticidad === "Atención").length;
-    const planif = informe.tableros.filter(t => t.criticidad === "Planificado").length;
-    const fechaFmt = new Date(informe.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
-
+    const htmlInforme = generarHTMLInforme(informe, config);
     return (
-      <div style={{ fontFamily: FONT, fontSize: 14, background: BG }}>
-        <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }} className="no-print">
+      <div style={{ fontFamily: FONT, fontSize: 14, background: BG, height: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
           <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
           <div style={{ display: "flex", gap: 8 }}>
             <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px" }} onClick={() => descargarHTML(informe, config)}>⬇ Descargar informe</button>
             <button style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={() => setEnviarScreen(true)}>📤 Enviar</button>
           </div>
         </div>
-        <style>{`@media print { .no-print { display: none !important; } body { background: white; } }`}</style>
-        <div style={{ background: PRIMARY, color: "white", padding: "40px 36px 32px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda. <span style={{ fontSize: 11, color: ACCENT, display: "block", letterSpacing: "0.3px" }}>Servicios Eléctricos</span></span>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{fechaFmt}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, marginTop: 4 }}>{informe.numero}</div>
-            </div>
-          </div>
-          <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, marginBottom: 6 }}>Informe de Mantención<br />Preventiva de Tableros</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", marginBottom: 22 }}>Inspección y registro de observaciones</div>
-          <div style={{ background: "rgba(255,255,255,0.08)", borderLeft: `4px solid ${ACCENT}`, padding: "12px 16px", borderRadius: 4, display: "flex", flexWrap: "wrap", gap: "12px 32px" }}>
-            <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Cliente</div><div style={{ fontSize: 13, fontWeight: 600 }}>{informe.cliente}</div></div>
-            {informe.contacto && <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Contacto</div><div style={{ fontSize: 13, fontWeight: 600 }}>{informe.contacto}</div></div>}
-            {informe.cartaGantt && <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Próxima mantención</div><div style={{ fontSize: 13, fontWeight: 600 }}>{informe.cartaGantt}</div></div>}
-          </div>
-        </div>
-        <div style={{ background: "white", padding: "28px 36px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: PRIMARY, borderBottom: `2px solid ${ACCENT}`, paddingBottom: 5, marginBottom: 18 }}>Resumen ejecutivo</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 22 }}>
-            {[
-              { n: informe.tableros.length, l: "Tableros inspeccionados", c: PRIMARY },
-              { n: criticos, l: "Observaciones críticas", c: "#c0392b" },
-              { n: atencion, l: "Atención prioritaria", c: "#d35400" },
-              { n: planif, l: "Planificados", c: "#1a5276" },
-            ].map((k,i) => (
-              <div key={i} style={{ background: BG, border: "1px solid #e8e8e8", borderRadius: 8, padding: "12px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 26, fontWeight: 700, color: k.c }}>{k.n}</div>
-                <div style={{ fontSize: 10, color: "#888", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.4px" }}>{k.l}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: PRIMARY, borderBottom: `2px solid ${ACCENT}`, paddingBottom: 5, marginBottom: 10 }}>EPP</div>
-          <p style={{ fontSize: 13, color: "#555", marginBottom: 18, lineHeight: 1.6 }}>{config.epp}</p>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: PRIMARY, borderBottom: `2px solid ${ACCENT}`, paddingBottom: 5, marginBottom: 10 }}>Personal de mantención</div>
-          <p style={{ fontSize: 13, color: "#555", marginBottom: 18 }}>{informe.personal.filter(Boolean).join(" · ")}</p>
-          <div style={{ padding: "12px 14px", background: BG, border: "1px solid #e8e8e8", borderRadius: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: PRIMARY, textTransform: "uppercase", letterSpacing: 0.5 }}>Condición: </span>
-            <span style={{ fontSize: 12, color: "#555" }}>{informe.condicion}</span>
-          </div>
-        </div>
-        <div style={{ background: "white", padding: "0 36px 36px", marginTop: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: PRIMARY, borderBottom: `2px solid ${ACCENT}`, paddingBottom: 5, marginBottom: 18 }}>Detalle por tablero</div>
-          {informe.tableros.map((t) => (
-            <div key={t.id} style={{ border: "1px solid #e0e0e0", borderRadius: 8, marginBottom: 16, overflow: "hidden" }}>
-              <div style={{ background: PRIMARY, color: "white", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{t.ubicacion}{t.numeroSala ? ` ${t.numeroSala}` : ""}</span>
-                <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "3px 10px", borderRadius: 12 }}>{t.piso}</span>
-              </div>
-              <div style={{ padding: "12px 16px" }}>
-                <span style={s.badge(t.criticidad)}>{t.criticidad}</span>
-                {t.garantia && <span style={{ marginLeft: 6, fontSize: 11, background: "#e8f4fd", color: "#1a5276", padding: "3px 8px", borderRadius: 10, fontWeight: 700 }}>En garantía</span>}
-                {t.registros?.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Registros fotográficos</div>
-                    {t.registros.map((reg, ri) => (
-                      <div key={ri} style={{ border: "1px solid #e8e8e8", borderRadius: 7, marginBottom: 8, overflow: "hidden" }}>
-                        <div style={{ background: "#3a3a3a", color: "white", padding: "5px 10px", fontSize: 11, fontWeight: 700 }}>Registro N° {ri + 1}</div>
-                        {reg.foto && <img src={reg.foto.data} alt="" style={{ width: "100%", maxHeight: 240, objectFit: "cover", display: "block" }} />}
-                        {(reg.observaciones.length > 0 || reg.cambioTablero) && (
-                          <div style={{ padding: "10px 12px" }}>
-                            {reg.observaciones.map((obs, oi) => (
-                              <div key={oi} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, padding: "5px 0", borderBottom: "1px solid #f0f0f0" }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "#aaa", minWidth: 18, paddingTop: 1 }}>{oi + 1}.</span>
-                                <span style={{ flex: 1, fontSize: 12, color: "#333", lineHeight: 1.5 }}>{obs.texto}</span>
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: CRITICO_BG[obs.criticidad], color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap" }}>{obs.criticidad}</span>
-                              </div>
-                            ))}
-                            {reg.cambioTablero && (
-                              <div style={{ marginTop: 8, padding: "7px 10px", background: "#fde8e8", border: "1px solid #c0392b", borderRadius: 6, fontSize: 12, fontWeight: 700, color: "#c0392b" }}>
-                                ⚠ Se recomienda cambio de tablero
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {t.fotos?.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Fotografías</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {t.fotos.map((f, fi) => <img key={fi} src={f.data} alt={f.name} style={{ width: 140, height: 105, objectFit: "cover", borderRadius: 6, border: "1px solid #e0e0e0" }} />)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ background: PRIMARY, color: "white", padding: "20px 36px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 6 }}>{config.rut} · {config.email}</div>
-          </div>
-          <div style={{ textAlign: "right", fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
-            <strong style={{ color: ACCENT }}>{informe.numero}</strong><br />
-            {informe.personal.filter(Boolean).join(" · ")}<br />
-            {informe.cartaGantt && <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>Próx. mantención: {informe.cartaGantt}</span>}
-          </div>
-        </div>
+        <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white" }} />
       </div>
     );
   }
