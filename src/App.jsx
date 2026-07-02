@@ -335,7 +335,7 @@ export default function App() {
           : '';
         return `<div style="border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px;overflow:hidden;">
           <div style="background:#3a3a3a;color:white;padding:6px 12px;font-size:11px;font-weight:700;">Registro N° ${ri+1}</div>
-          ${reg.foto ? `<img src="${reg.foto.data}" style="width:100%;max-height:320px;object-fit:cover;display:block;" />` : '<div style="height:160px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:#f7f7f7;">Sin fotografía</div>'}
+          ${reg.foto ? `<img src="${reg.foto.data}" style="width:100%;max-height:420px;object-fit:contain;display:block;background:#f0f0f0;" />` : '<div style="height:160px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:#f7f7f7;">Sin fotografía</div>'}
           ${obsHTML || cambioHTML ? `<div style="padding:12px 14px;">
             ${obsHTML}
             ${cambioHTML}
@@ -429,6 +429,17 @@ export default function App() {
       <div style="font-size:10px;color:#1a3a45;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Obs. Leve</div>
     </div>
   </div>
+</div>
+
+<!-- DETALLE POR TABLERO -->
+<div style="background:white;padding:28px 40px;margin-top:8px;border-bottom:3px solid #f0f0f0;">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:20px;">Detalle por Tablero</div>
+  ${tablerosHTML}
+</div>
+
+<!-- EPP Y PERSONAL -->
+<div style="background:white;padding:28px 40px;margin-top:8px;border-bottom:3px solid #f0f0f0;">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:18px;">Personal y Equipamiento de Seguridad</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
     <div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:1px solid #e8b923;padding-bottom:4px;margin-bottom:8px;">EPP Utilizado</div>
@@ -439,12 +450,6 @@ export default function App() {
       <p style="font-size:13px;color:#333;font-weight:600;">${inf.personal.filter(Boolean).join(' · ')}</p>
     </div>
   </div>
-</div>
-
-<!-- DETALLE POR TABLERO -->
-<div style="background:white;padding:28px 40px;margin-top:8px;border-bottom:3px solid #f0f0f0;">
-  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:20px;">Detalle por Tablero</div>
-  ${tablerosHTML}
 </div>
 
 
