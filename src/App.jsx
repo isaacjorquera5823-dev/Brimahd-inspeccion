@@ -431,25 +431,21 @@ export default function App() {
   </div>
 </div>
 
+<!-- EPP Y PERSONAL -->
+<div style="background:white;padding:28px 40px;margin-top:8px;border-bottom:3px solid #f0f0f0;">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:18px;">Personal y Equipamiento de Seguridad</div>
+  <div>
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:1px solid #e8b923;padding-bottom:4px;margin-bottom:8px;">EPP Utilizado</div>
+    <p style="font-size:12px;color:#555;line-height:1.7;margin-bottom:18px;">${cfg.epp}</p>
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:1px solid #e8b923;padding-bottom:4px;margin-bottom:8px;">Personal de Mantención</div>
+    <p style="font-size:13px;color:#333;font-weight:600;">${inf.personal.filter(Boolean).join(' · ')}</p>
+  </div>
+</div>
+
 <!-- DETALLE POR TABLERO -->
 <div style="background:white;padding:28px 40px;margin-top:8px;border-bottom:3px solid #f0f0f0;">
   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:20px;">Detalle por Tablero</div>
   ${tablerosHTML}
-</div>
-
-<!-- EPP Y PERSONAL -->
-<div style="background:white;padding:28px 40px;margin-top:8px;border-bottom:3px solid #f0f0f0;">
-  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:18px;">Personal y Equipamiento de Seguridad</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-    <div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:1px solid #e8b923;padding-bottom:4px;margin-bottom:8px;">EPP Utilizado</div>
-      <p style="font-size:12px;color:#555;line-height:1.7;">${cfg.epp}</p>
-    </div>
-    <div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:1px solid #e8b923;padding-bottom:4px;margin-bottom:8px;">Personal de Mantención</div>
-      <p style="font-size:13px;color:#333;font-weight:600;">${inf.personal.filter(Boolean).join(' · ')}</p>
-    </div>
-  </div>
 </div>
 
 
