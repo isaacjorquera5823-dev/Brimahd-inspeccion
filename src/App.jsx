@@ -1,4 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, runTransaction } from "firebase/firestore";
 
 const PRIMARY = "#2c2c2c";
 const ACCENT = "#e8b923";
@@ -50,6 +52,9 @@ const OBSERVACIONES_PREDEFINIDAS = [
 ];
 
 const TECNICOS = ["Emanuel Madrid", "César Huerta", "Carlos Madrid"];
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const ANIO_ACTUAL = new Date().getFullYear();
+const ANIOS = [ANIO_ACTUAL, ANIO_ACTUAL + 1, ANIO_ACTUAL + 2, ANIO_ACTUAL + 3];
 
 const SEDES = [
   { nombre: "Sede Alameda",                  contacto: "Angel Carrasco V.",  direccion: "Av. España N°8, Santiago Centro" },
@@ -96,6 +101,39 @@ function useLocalStorage(key, init) {
   return [val, set];
 }
 
+// ===== Contador correlativo compartido (Firebase Firestore) =====
+// Reemplaza estos valores por el bloque "firebaseConfig" que te entrega la consola de Firebase.
+const firebaseConfig = {
+  apiKey: "AIzaSyDBcK_kzOJA2tctImT2k6iWXu3qhPwzP3I",
+  authDomain: "brimahd-inspeccion.firebaseapp.com",
+  projectId: "brimahd-inspeccion",
+  storageBucket: "brimahd-inspeccion.firebasestorage.app",
+  messagingSenderId: "242416425759",
+  appId: "1:242416425759:web:0a7724ccb8480dc5626e2a",
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const contadorRef = doc(db, "contadores", "informes");
+
+// Muestra el próximo número sin consumirlo (solo para vista previa en pantalla de inicio)
+async function peekNextNumber() {
+  const snap = await getDoc(contadorRef);
+  const valor = snap.exists() ? snap.data().valor : 1;
+  return `INF-${String(valor).padStart(4, "0")}`;
+}
+
+// Reserva y consume el siguiente número de forma atómica (a prueba de choques entre celulares)
+async function reserveNextNumber() {
+  const valorReservado = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(contadorRef);
+    const actual = snap.exists() ? snap.data().valor : 1;
+    tx.set(contadorRef, { valor: actual + 1 }, { merge: true });
+    return actual;
+  });
+  return `INF-${String(valorReservado).padStart(4, "0")}`;
+}
+
 function Logo({ size = 36, withText = true }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -122,7 +160,6 @@ function Logo({ size = 36, withText = true }) {
 export default function App() {
   const [screen, setScreen] = useState("inicio");
   const [config, setConfig] = useLocalStorage("brimahd_config", defaultConfig);
-  const [counter, setCounter] = useLocalStorage("brimahd_counter", 1);
   const [informe, setInforme] = useState(null);
   const [editIdx, setEditIdx] = useState(null);
   const [tableroEdit, setTableroEdit] = useState(null);
@@ -134,10 +171,15 @@ export default function App() {
   const [obsPicker, setObsPicker] = useState(null); // { regIdx } when picker is open
   const fileRef = useRef({});
 
-  const numInforme = `INF-${String(counter).padStart(4,"0")}`;
+  const [proximoNumero, setProximoNumero] = useState("Cargando...");
+  const [generando, setGenerando] = useState(false);
+
+  useEffect(() => {
+    peekNextNumber().then(setProximoNumero).catch(() => setProximoNumero("Sin conexión"));
+  }, [screen]);
 
   function iniciarInforme() {
-    setInforme({ ...defaultInforme, numero: numInforme, fecha: new Date().toISOString().slice(0,10), tableros: [] });
+    setInforme({ ...defaultInforme, numero: proximoNumero, fecha: new Date().toISOString().slice(0,10), tableros: [] });
     setSedeSearch("");
     setScreen("informe");
   }
@@ -233,11 +275,19 @@ export default function App() {
     });
   }
 
-  function generarInforme() {
+  async function generarInforme() {
     if (!informe.cliente.trim()) return alert("Ingresa el nombre del cliente");
     if (informe.tableros.length === 0) return alert("Agrega al menos un tablero");
-    setCounter(counter + 1);
-    setScreen("preview");
+    setGenerando(true);
+    try {
+      const numeroFinal = await reserveNextNumber();
+      setInforme(p => ({ ...p, numero: numeroFinal }));
+      setScreen("preview");
+    } catch (e) {
+      alert("No se pudo asignar el número de informe. Verifica tu conexión a internet e intenta nuevamente.");
+    } finally {
+      setGenerando(false);
+    }
   }
 
   function descargarHTML(inf, cfg) {
@@ -509,7 +559,7 @@ ${criticasRows.length > 0 ? `
 
           <div style={{ fontSize: 18, fontWeight: 700, color: PRIMARY, marginBottom: 6 }}>App de Inspección</div>
           <div style={{ fontSize: 13, color: "#888", marginBottom: 6 }}>Próximo número:</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: ACCENT, marginBottom: 20 }}>{numInforme}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: ACCENT, marginBottom: 20 }}>{proximoNumero}</div>
           <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: "13px" }} onClick={iniciarInforme}>+ Crear nuevo informe</button>
         </div>
         <div style={{ ...s.card, background: "#f0f0f0", border: "none" }}>
@@ -596,7 +646,30 @@ ${criticasRows.length > 0 ? `
         <div style={s.card}>
           <div style={s.sectionTitle}>Próxima mantención</div>
           <label style={s.label}>Fecha próxima visita</label>
-          <input style={s.input} value={informe.cartaGantt} onChange={e => updateInforme("cartaGantt", e.target.value)} placeholder="Ej: Agosto 2026" />
+          <div style={s.row}>
+            <select
+              style={{ ...s.select, flex: 1, marginBottom: 0 }}
+              value={informe.cartaGantt.split(" ")[0] || ""}
+              onChange={e => {
+                const anio = informe.cartaGantt.split(" ")[1] || String(ANIO_ACTUAL);
+                updateInforme("cartaGantt", e.target.value ? `${e.target.value} ${anio}` : "");
+              }}
+            >
+              <option value="">Mes</option>
+              {MESES.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select
+              style={{ ...s.select, flex: 1, marginBottom: 0 }}
+              value={informe.cartaGantt.split(" ")[1] || ""}
+              onChange={e => {
+                const mes = informe.cartaGantt.split(" ")[0] || "";
+                updateInforme("cartaGantt", mes ? `${mes} ${e.target.value}` : (e.target.value ? ` ${e.target.value}` : ""));
+              }}
+            >
+              <option value="">Año</option>
+              {ANIOS.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
         </div>
         <div style={s.card}>
           <div style={{ ...s.row, justifyContent: "space-between", marginBottom: 12 }}>
@@ -622,7 +695,7 @@ ${criticasRows.length > 0 ? `
           ))}
           <button style={{ ...s.btn, ...s.btnAccent, width: "100%", marginTop: 4 }} onClick={() => openTablero(null)}>+ Agregar tablero</button>
         </div>
-        <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 14, fontSize: 15 }} onClick={generarInforme}>Generar informe →</button>
+        <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 14, fontSize: 15, opacity: generando ? 0.6 : 1 }} onClick={generarInforme} disabled={generando}>{generando ? "Generando…" : "Generar informe →"}</button>
         <div style={{ height: 20 }} />
       </div>
     </div>
