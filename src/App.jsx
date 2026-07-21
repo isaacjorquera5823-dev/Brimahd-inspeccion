@@ -11,44 +11,63 @@ const CRITICIDAD = ["Crítica", "Media", "Leve"];
 const CRITICO_COLOR = { "Crítica": "#ffffff", "Media": "#7a3800", "Leve": "#1a3a45" };
 const CRITICO_BG   = { "Crítica": "#c0392b", "Media": "#f39c12", "Leve": "#7fb3c8" };
 const CRITICO_BORDER = { "Crítica": "#a93226", "Media": "#d68910", "Leve": "#5d9db5" };
-const PISOS = ["Piso -2","Piso -1","Zócalo","Piso 1","Piso 2","Piso 3","Piso 4","Piso 5","Piso 6","Piso 7","Piso 8","Piso 9","Piso 10","Piso 11","Piso 12","Piso 13","Piso 14","Piso 15","Azotea"];
-const UBICACIONES = ["Sala","Pasillo","Shaft","Oficina","Laboratorio","Cancha","Auditorio"];
+const PISOS = ["Piso -3","Piso -2","Piso -1","Zócalo","Piso 1","Piso 2","Piso 3","Piso 4","Piso 5","Piso 6","Piso 7","Piso 8","Piso 9","Piso 10","Piso 11","Piso 12","Piso 13","Piso 14","Piso 15","Azotea"];
+const UBICACIONES = ["Sala","Pasillo","Shaft","Laboratorio","Cancha","Multicancha","Auditorio","Administración","Coordinación Docente","Coordinación de Carrera","Servicios Digitales"];
+const MARCAS = ["LEGRAND","SCHNEIDER","ABB","Otro"];
+const ZONAS = ["Torre 1","Torre 2","Torre 3","Torre 4","CIT","Boulevard","Otro"];
 const OBSERVACIONES_PREDEFINIDAS = [
   // ── Crítica ──
-  { texto: "Se detectan ferrules deteriorados o mal instalados; el conductor queda expuesto sin aislación en el punto de conexión", criticidad: "Crítica" },
-  { texto: "Circuito de alumbrado accionado mediante protección automática en lugar de interruptor de mando; configuración fuera de norma", criticidad: "Crítica" },
-  { texto: "Se observan extensiones de conductores al interior del tablero ejecutadas fuera de norma técnica", criticidad: "Crítica" },
-  { texto: "Se detectan dos conductores conectados aguas abajo en cada contactor de alumbrado; configuración no permitida por normativa", criticidad: "Crítica" },
-  { texto: "Protección automática en mal estado; se recomienda reemplazo inmediato", criticidad: "Crítica" },
-  { texto: "Barra de distribución sin mica protectora; partes activas expuestas representan riesgo de contacto eléctrico directo", criticidad: "Crítica" },
-  { texto: "Tablero sin conexión a tierra; ausencia de puesta a tierra en la estructura metálica", criticidad: "Crítica" },
-  { texto: "Puerta del tablero sin conexión equipotencial a tierra", criticidad: "Crítica" },
-  { texto: "Chapa de acceso en mal estado; no garantiza el cierre seguro del tablero", criticidad: "Crítica" },
-  { texto: "Puerta del tablero en mal estado; requiere reemplazo para asegurar la protección del equipamiento", criticidad: "Crítica" },
-  { texto: "Se detectan conexiones fuera de norma con múltiples conductores en un mismo punto de conexión", criticidad: "Crítica" },
-  { texto: "Se observan conductores sueltos al interior del tablero sin sujeción ni punto de conexión definido", criticidad: "Crítica" },
-  { texto: "Se detectan circuitos en corte sin señalización ni protección activa", criticidad: "Crítica" },
-  { texto: "Circuito sin protección diferencial; ausencia de dispositivo de protección contra corrientes de fuga", criticidad: "Crítica" },
-  { texto: "Se detectan conexiones fuera de norma eléctrica vigente", criticidad: "Crítica" },
+  { texto: "Conexiones fuera de norma", criticidad: "Crítica" },
+  { texto: "Contactor Zumbando", criticidad: "Crítica" },
+  { texto: "Circuito en corte", criticidad: "Crítica" },
+  { texto: "Bypass en protección diferencial", criticidad: "Crítica" },
+  { texto: "Automático en mal estado", criticidad: "Crítica" },
+  { texto: "Ventilador en mal estado", criticidad: "Crítica" },
+  { texto: "Tablero Fuera de Norma", criticidad: "Crítica" },
+  { texto: "Faltan protecciones diferenciales", criticidad: "Crítica" },
+  { texto: "Cambiar tablero eléctrico", criticidad: "Crítica" },
+  { texto: "Falta aterrizar puerta tablero", criticidad: "Crítica" },
+  { texto: "Falta aterrizar gabinete", criticidad: "Crítica" },
+  { texto: "Mejorar aterrizaje de tablero", criticidad: "Crítica" },
+  { texto: "Faltan luces pilotos", criticidad: "Crítica" },
+  { texto: "Mica protectora en mal estado", criticidad: "Crítica" },
+  { texto: "Cambiar barra tetrapolar por colapso", criticidad: "Crítica" },
+  { texto: "No se respeta código de colores en conexiones de borneras", criticidad: "Crítica" },
+  { texto: "Cambiar barra tetrapolar, dañada", criticidad: "Crítica" },
+  { texto: "Tablero Dañado, se requiere el cambio", criticidad: "Crítica" },
+  { texto: "Acceso restringido al tablero", criticidad: "Crítica" },
+  { texto: "Cambiar barra tetrapolar por daño o sin mica", criticidad: "Crítica" },
+  { texto: "Existen más de una conexión por punto", criticidad: "Crítica" },
   // ── Media ──
-  { texto: "Protecciones generales sin separadores entre fases; se recomienda instalación de divisores dieléctricos", criticidad: "Media" },
-  { texto: "Conductores conectados a borneras sin ferrule terminal; riesgo de aflojamiento y arco eléctrico", criticidad: "Media" },
-  { texto: "Conductores conectados a la barra de neutro sin ferrule terminal", criticidad: "Media" },
-  { texto: "Conductores conectados a la barra de tierra sin ferrule terminal", criticidad: "Media" },
-  { texto: "Conductores conectados a las protecciones generales sin terminales de conexión", criticidad: "Media" },
-  { texto: "Contactor con zumbido anormal durante operación; indica desgaste de bobina o problema en el núcleo magnético", criticidad: "Media" },
-  { texto: "Bandejas interiores de canalización colapsadas; se recomienda reemplazo o ampliación", criticidad: "Media" },
-  { texto: "Terminales de conexión en mal estado o con instalación deficiente", criticidad: "Media" },
-  { texto: "Ventilador de extracción del tablero en mal estado; afecta la disipación térmica del equipamiento", criticidad: "Media" },
-  { texto: "Falta señalética de riesgo eléctrico en la puerta del tablero", criticidad: "Media" },
+  { texto: "Cambiar terminales ferrulers", criticidad: "Media" },
+  { texto: "Chapa en mal estado", criticidad: "Media" },
+  { texto: "Luces pilotos en mal estado", criticidad: "Media" },
+  { texto: "Falta cuadros de carga y diagramas", criticidad: "Media" },
+  { texto: "Faltan Terminales ferrulers", criticidad: "Media" },
+  { texto: "Faltan Terminales de Ojo", criticidad: "Media" },
+  { texto: "Falta separadores en protección", criticidad: "Media" },
+  { texto: "Faltan tapas BPC", criticidad: "Media" },
+  { texto: "Faltan tapas de bandejas interiores", criticidad: "Media" },
+  { texto: "Rotular NEUTRO", criticidad: "Media" },
+  { texto: "Rotular alimentadores", criticidad: "Media" },
+  { texto: "Faltan Fusibles", criticidad: "Media" },
+  { texto: "Falta equipos de alumbrado", criticidad: "Media" },
+  { texto: "Cambiar equipo de luz interior", criticidad: "Media" },
+  { texto: "Cambiar conexión de luces pilotos", criticidad: "Media" },
+  { texto: "Falta rotulación de circuitos", criticidad: "Media" },
+  { texto: "Faltan falsos polos", criticidad: "Media" },
+  { texto: "Cambiar interruptor", criticidad: "Media" },
+  { texto: "Riel din suelto", criticidad: "Media" },
+  { texto: "Tablero plástico, se recomienda el cambio", criticidad: "Media" },
+  { texto: "Tablero colapsado, se recomiendo el cambio", criticidad: "Media" },
+  { texto: "Tapa interior del tablero sin calados", criticidad: "Media" },
   // ── Leve ──
-  { texto: "Se requiere actualización de cuadros de carga y diagramas unilineales", criticidad: "Leve" },
-  { texto: "Faltan falsos polos para completar el relleno del riel DIN y evitar acceso accidental a partes activas", criticidad: "Leve" },
-  { texto: "Falta rotulación de alimentadores principales", criticidad: "Leve" },
-  { texto: "Luces piloto en mal estado; se recomienda reemplazo", criticidad: "Leve" },
-  { texto: "Luz interior del tablero en mal estado; se recomienda reemplazo", criticidad: "Leve" },
-  { texto: "Rotulación de circuitos incompleta o ilegible; se recomienda actualización", criticidad: "Leve" },
-  { texto: "Falta rotulación de luces piloto en la puerta del tablero", criticidad: "Leve" },
+  { texto: "Falta Señalética de Peligro", criticidad: "Leve" },
+  { texto: "Cambiar señalética de peligro", criticidad: "Leve" },
+  { texto: "Actualizar cuadros de carga y diagramas unilineales", criticidad: "Leve" },
+  { texto: "Rotular Luces Pilotos", criticidad: "Leve" },
+  { texto: "Rotular tablero (actualizar)", criticidad: "Leve" },
+  { texto: "Mezcla de marcas en protecciones", criticidad: "Leve" },
 ];
 
 const TECNICOS = ["Emanuel Madrid", "César Huerta", "Carlos Madrid"];
@@ -86,7 +105,8 @@ const defaultInforme = {
 };
 
 const emptyTablero = () => ({
-  id: Date.now(), ubicacion: "Sala", numeroSala: "", piso: "Piso 1", criticidad: "Media",
+  id: Date.now(), zona: "Torre 1", zonaOtro: "", ubicacion: "Sala", numeroSala: "", piso: "Piso 1", criticidad: "Media",
+  nombreTablero: "", proteccionGeneral: "", marca: "LEGRAND", marcaOtro: "",
   garantia: false, registros: [],
 });
 const emptyRegistro = () => ({
@@ -167,6 +187,8 @@ export default function App() {
   const [sedeSearch, setSedeSearch] = useState("");
   const [sedeFocused, setSedeFocused] = useState(false);
   const [obsSearch, setObsSearch] = useState([]);
+  const [obsLibreTexto, setObsLibreTexto] = useState([]);
+  const [obsLibreCrit, setObsLibreCrit] = useState([]);
   const [obsFocused, setObsFocused] = useState([]);
   const [obsPicker, setObsPicker] = useState(null); // { regIdx } when picker is open
   const fileRef = useRef({});
@@ -343,6 +365,15 @@ export default function App() {
         </div>`;
       }).join('');
 
+      const zonaTexto = t.zona === "Otro" ? t.zonaOtro : t.zona;
+      const marcaTexto = t.marca === "Otro" ? t.marcaOtro : t.marca;
+      const metaItems = [
+        zonaTexto ? `Zona: <b>${zonaTexto}</b>` : '',
+        t.nombreTablero ? `Nombre tablero: <b>${t.nombreTablero}</b>` : '',
+        t.proteccionGeneral ? `Protección general: <b>${t.proteccionGeneral}</b>` : '',
+        marcaTexto ? `Marca: <b>${marcaTexto}</b>` : '',
+      ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+
       return `<div style="margin-bottom:28px;border-radius:10px;overflow:hidden;border:1px solid #e0e0e0;page-break-inside:avoid;">
         <div style="background:#2c2c2c;color:white;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div style="display:flex;align-items:center;gap:10px;">
@@ -352,6 +383,7 @@ export default function App() {
           </div>
           <span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:10px;background:${critBg};color:${critFg};">${t.criticidad}</span>
         </div>
+        ${metaItems ? `<div style="background:#f7f7f7;padding:8px 18px;font-size:11px;color:#555;border-bottom:1px solid #e0e0e0;">${metaItems}</div>` : ''}
         <div style="padding:16px 18px;background:white;">
           ${registrosHTML}
         </div>
@@ -752,6 +784,33 @@ ${criticasRows.length > 0 ? `
               );
             })}
           </div>
+          <div style={s.card}>
+            <div style={s.sectionTitle}>¿No está en la lista? Agrégala manualmente</div>
+            <label style={s.label}>Observación</label>
+            <input
+              style={s.input}
+              value={obsLibreTexto[regIdx] || ""}
+              onChange={e => setObsLibreTexto(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
+              placeholder="Escribe la observación"
+            />
+            <label style={s.label}>Criticidad</label>
+            <select
+              style={s.select}
+              value={obsLibreCrit[regIdx] || "Media"}
+              onChange={e => setObsLibreCrit(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}>
+              {CRITICIDAD.map(c => <option key={c}>{c}</option>)}
+            </select>
+            <button
+              style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 12, marginTop: 10 }}
+              onClick={() => {
+                const texto = (obsLibreTexto[regIdx] || "").trim();
+                if (!texto) return;
+                addObsToRegistro(regIdx, { texto, criticidad: obsLibreCrit[regIdx] || "Media", libre: true });
+                setObsLibreTexto(p => { const a = [...p]; a[regIdx] = ""; return a; });
+              }}>
+              + Agregar observación
+            </button>
+          </div>
           {reg.observaciones.length > 0 && (
             <div style={s.card}>
               <div style={s.sectionTitle}>Seleccionadas ({reg.observaciones.length})</div>
@@ -787,20 +846,38 @@ ${criticasRows.length > 0 ? `
         {/* ── Datos del tablero ── */}
         <div style={s.card}>
           <div style={s.sectionTitle}>Identificación</div>
+          <label style={s.label}>Zona</label>
+          <select style={s.select} value={tableroEdit.zona} onChange={e => setTableroEdit(p => ({ ...p, zona: e.target.value, zonaOtro: "" }))}>
+            {ZONAS.map(z => <option key={z}>{z}</option>)}
+          </select>
+          {tableroEdit.zona === "Otro" && (
+            <input style={s.input} value={tableroEdit.zonaOtro} onChange={e => setTableroEdit(p => ({ ...p, zonaOtro: e.target.value }))} placeholder="Escribe la zona" />
+          )}
           <label style={s.label}>Ubicación</label>
           <select style={s.select} value={tableroEdit.ubicacion} onChange={e => setTableroEdit(p => ({ ...p, ubicacion: e.target.value, numeroSala: "" }))}>
             {UBICACIONES.map(u => <option key={u}>{u}</option>)}
           </select>
-          {tableroEdit.ubicacion === "Sala" && (
+          {(tableroEdit.ubicacion === "Sala" || tableroEdit.ubicacion === "Laboratorio") && (
             <>
-              <label style={s.label}>Número de sala</label>
-              <input style={s.input} value={tableroEdit.numeroSala} onChange={e => setTableroEdit(p => ({ ...p, numeroSala: e.target.value }))} placeholder="Ej: 302" />
+              <label style={s.label}>{tableroEdit.ubicacion === "Laboratorio" ? "Nombre laboratorio" : "Número de sala"}</label>
+              <input style={s.input} value={tableroEdit.numeroSala} onChange={e => setTableroEdit(p => ({ ...p, numeroSala: e.target.value }))} placeholder={tableroEdit.ubicacion === "Laboratorio" ? "Ej: Laboratorio de Redes" : "Ej: 302"} />
             </>
           )}
           <label style={s.label}>Piso</label>
           <select style={s.select} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
             {PISOS.map(p => <option key={p}>{p}</option>)}
           </select>
+          <label style={s.label}>Nombre de tablero</label>
+          <input style={s.input} value={tableroEdit.nombreTablero} onChange={e => setTableroEdit(p => ({ ...p, nombreTablero: e.target.value }))} placeholder="Ej: TD-1" />
+          <label style={s.label}>Protección general</label>
+          <input style={s.input} value={tableroEdit.proteccionGeneral} onChange={e => setTableroEdit(p => ({ ...p, proteccionGeneral: e.target.value }))} placeholder="Ej: 3x100A" />
+          <label style={s.label}>Marca</label>
+          <select style={s.select} value={tableroEdit.marca} onChange={e => setTableroEdit(p => ({ ...p, marca: e.target.value, marcaOtro: "" }))}>
+            {MARCAS.map(m => <option key={m}>{m}</option>)}
+          </select>
+          {tableroEdit.marca === "Otro" && (
+            <input style={s.input} value={tableroEdit.marcaOtro} onChange={e => setTableroEdit(p => ({ ...p, marcaOtro: e.target.value }))} placeholder="Escribe la marca" />
+          )}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? "#e8f4fd" : "#f8f8f8", border: `1px solid ${tableroEdit.garantia ? "#1a5276" : "#e0e0e0"}`, borderRadius: 8 }}>
             <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? "#1a5276" : "#555" }}>Tablero en garantía</span>
             <button onClick={() => setTableroEdit(p => ({ ...p, garantia: !p.garantia }))}
