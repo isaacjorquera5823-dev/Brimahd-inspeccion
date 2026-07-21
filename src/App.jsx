@@ -334,7 +334,8 @@ export default function App() {
     // Tabla de observaciones críticas detallada
     const criticasRows = [];
     inf.tableros.forEach(t => {
-      const ubicLabel = `${t.ubicacion}${t.numeroSala ? " "+t.numeroSala : ""} — ${t.piso}`;
+      const zonaTexto = t.zona === "Otro" ? t.zonaOtro : t.zona;
+      const ubicLabel = [zonaTexto, t.piso, t.ubicacion, t.numeroSala].filter(Boolean).join(' — ');
       (t.registros||[]).forEach((reg, ri) => {
         reg.observaciones.filter(o => o.criticidad === "Crítica").forEach(obs => {
           const rowBg = criticasRows.length % 2 === 0 ? '#fff5f5' : '#ffffff';
@@ -379,7 +380,6 @@ export default function App() {
       const zonaTexto = t.zona === "Otro" ? t.zonaOtro : t.zona;
       const marcaTexto = t.marca === "Otro" ? t.marcaOtro : t.marca;
       const metaItems = [
-        zonaTexto ? `Zona: <b>${zonaTexto}</b>` : '',
         t.nombreTablero ? `Nombre tablero: <b>${t.nombreTablero}</b>` : '',
         t.proteccionGeneral ? `Protección general: <b>${t.proteccionGeneral}</b>` : '',
         marcaTexto ? `Marca: <b>${marcaTexto}</b>` : '',
@@ -387,10 +387,12 @@ export default function App() {
 
       return `<div style="margin-bottom:28px;border-radius:10px;overflow:hidden;border:1px solid #e0e0e0;page-break-inside:avoid;">
         <div style="background:#2c2c2c;color:white;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:15px;font-weight:700;">${t.ubicacion}${t.numeroSala ? " "+t.numeroSala : ""}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:15px;font-weight:700;">${zonaTexto || t.ubicacion}</span>
             <span style="font-size:11px;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:10px;">${t.piso}</span>
-            ${t.garantia ? '<span style="font-size:11px;background:#1a5276;color:white;padding:3px 10px;border-radius:10px;font-weight:700;">En garantía</span>' : ''}
+            ${zonaTexto ? `<span style="font-size:11px;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:10px;">${t.ubicacion}</span>` : ''}
+            ${t.numeroSala ? `<span style="font-size:11px;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:10px;">${t.numeroSala}</span>` : ''}
+            ${t.garantia ? '<span style="font-size:11px;background:#6b4fa0;color:white;padding:3px 10px;border-radius:10px;font-weight:700;">En garantía</span>' : ''}
           </div>
           <span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:10px;background:${critBg};color:${critFg};">${t.criticidad}</span>
         </div>
@@ -474,12 +476,16 @@ export default function App() {
 
 <!-- EPP Y PERSONAL -->
 <div style="background:white;padding:28px 40px;margin-top:8px;border-bottom:3px solid #f0f0f0;">
-  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:18px;">Personal y Equipamiento de Seguridad</div>
+  <div style="font-size:15px;font-weight:700;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:8px;margin-bottom:18px;">Personal y Equipamiento de Seguridad</div>
   <div>
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:1px solid #e8b923;padding-bottom:4px;margin-bottom:8px;">EPP Utilizado</div>
-    <p style="font-size:12px;color:#555;line-height:1.7;margin-bottom:18px;">${cfg.epp}</p>
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#2c2c2c;border-bottom:1px solid #e8b923;padding-bottom:4px;margin-bottom:8px;">Personal de Mantención</div>
-    <p style="font-size:13px;color:#333;font-weight:600;">${inf.personal.filter(Boolean).join(' · ')}</p>
+    <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#888;min-width:140px;flex-shrink:0;">EPP Utilizado</div>
+      <p style="font-size:12px;color:#555;line-height:1.6;margin:0;">${cfg.epp}</p>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:14px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#888;min-width:140px;flex-shrink:0;">Personal de Mantención</div>
+      <p style="font-size:13px;color:#333;font-weight:600;margin:0;">${inf.personal.filter(Boolean).join(' · ')}</p>
+    </div>
   </div>
 </div>
 
@@ -581,7 +587,8 @@ ${criticasRows.length > 0 ? `
     // Build critical observations list for email body
     const criticas = [];
     inf.tableros.forEach(t => {
-      const ubicLabel = `${t.ubicacion}${t.numeroSala ? " "+t.numeroSala : ""} — ${t.piso}`;
+      const zonaTexto = t.zona === "Otro" ? t.zonaOtro : t.zona;
+      const ubicLabel = [zonaTexto, t.piso, t.ubicacion, t.numeroSala].filter(Boolean).join(' — ');
       (t.registros||[]).forEach((reg, ri) => {
         reg.observaciones.filter(o => o.criticidad === "Crítica").forEach(obs => {
           criticas.push(`  • [${ubicLabel} / Registro N°${ri+1}] ${obs.texto}`);
@@ -751,12 +758,12 @@ ${criticasRows.length > 0 ? `
           {informe.tableros.map((t, i) => (
             <div key={t.id} style={{ border: "1px solid #e0e0e0", borderRadius: 8, marginBottom: 10, overflow: "hidden" }}>
               <div style={{ background: PRIMARY, color: "white", padding: "9px 13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{t.ubicacion}{t.numeroSala ? ` ${t.numeroSala}` : ""}</span>
-                <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 10 }}>{t.piso}</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{(t.zona === "Otro" ? t.zonaOtro : t.zona) || t.ubicacion}</span>
+                <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 10 }}>{t.piso} · {t.ubicacion}{t.numeroSala ? ` ${t.numeroSala}` : ""}</span>
               </div>
               <div style={{ padding: "10px 13px" }}>
                 <span style={s.badge(t.criticidad)}>{t.criticidad}</span>
-                {t.garantia && <span style={{ marginLeft: 6, fontSize: 11, background: "#e8f4fd", color: "#1a5276", padding: "3px 8px", borderRadius: 10, fontWeight: 700 }}>En garantía</span>}
+                {t.garantia && <span style={{ marginLeft: 6, fontSize: 11, background: "#f1ecfa", color: "#6b4fa0", padding: "3px 8px", borderRadius: 10, fontWeight: 700 }}>En garantía</span>}
                 <div style={{ fontSize: 12, color: "#555", marginTop: 8, lineHeight: 1.5 }}>{t.registros?.length > 0 ? `${t.registros.length} registro${t.registros.length > 1 ? "s" : ""}` : "Sin registros"}</div>
 
                 <div style={{ ...s.row, marginTop: 10, justifyContent: "flex-end" }}>
@@ -888,6 +895,10 @@ ${criticasRows.length > 0 ? `
           {tableroEdit.zona === "Otro" && (
             <input style={s.input} value={tableroEdit.zonaOtro} onChange={e => setTableroEdit(p => ({ ...p, zonaOtro: e.target.value }))} placeholder="Escribe la zona" />
           )}
+          <label style={s.label}>Piso</label>
+          <select style={s.select} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
+            {PISOS.map(p => <option key={p}>{p}</option>)}
+          </select>
           <label style={s.label}>Ubicación</label>
           <select style={s.select} value={tableroEdit.ubicacion} onChange={e => setTableroEdit(p => ({ ...p, ubicacion: e.target.value, numeroSala: "" }))}>
             {UBICACIONES.map(u => <option key={u}>{u}</option>)}
@@ -898,10 +909,6 @@ ${criticasRows.length > 0 ? `
               <input style={s.input} value={tableroEdit.numeroSala} onChange={e => setTableroEdit(p => ({ ...p, numeroSala: e.target.value }))} placeholder={tableroEdit.ubicacion === "Laboratorio" ? "Ej: Laboratorio de Redes" : "Ej: 302"} />
             </>
           )}
-          <label style={s.label}>Piso</label>
-          <select style={s.select} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
-            {PISOS.map(p => <option key={p}>{p}</option>)}
-          </select>
           <label style={s.label}>Nombre de tablero</label>
           <input style={s.input} value={tableroEdit.nombreTablero} onChange={e => setTableroEdit(p => ({ ...p, nombreTablero: e.target.value }))} placeholder="Ej: TD-1" />
           <label style={s.label}>Protección general</label>
@@ -913,10 +920,10 @@ ${criticasRows.length > 0 ? `
           {tableroEdit.marca === "Otro" && (
             <input style={s.input} value={tableroEdit.marcaOtro} onChange={e => setTableroEdit(p => ({ ...p, marcaOtro: e.target.value }))} placeholder="Escribe la marca" />
           )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? "#e8f4fd" : "#f8f8f8", border: `1px solid ${tableroEdit.garantia ? "#1a5276" : "#e0e0e0"}`, borderRadius: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? "#1a5276" : "#555" }}>Tablero en garantía</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? "#f1ecfa" : "#f8f8f8", border: `1px solid ${tableroEdit.garantia ? "#6b4fa0" : "#e0e0e0"}`, borderRadius: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? "#6b4fa0" : "#555" }}>Tablero en garantía</span>
             <button onClick={() => setTableroEdit(p => ({ ...p, garantia: !p.garantia }))}
-              style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? "#1a5276" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+              style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? "#6b4fa0" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
               <div style={{ position: "absolute", top: 4, left: tableroEdit.garantia ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
             </button>
           </div>
