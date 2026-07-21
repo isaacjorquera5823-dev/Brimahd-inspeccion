@@ -98,8 +98,19 @@ const defaultConfig = {
   epp: "Casco, Antiparras, Guantes de Aislación, Guantes PU, Zapatos de Seguridad Aislados, Herramientas Aisladas",
 };
 
+// Devuelve la fecha de HOY en horario local (YYYY-MM-DD).
+// No usar new Date().toISOString() para esto: convierte a UTC y en Chile
+// (UTC-4/UTC-3) puede mostrar el día siguiente durante la tarde/noche.
+function fechaLocalHoy() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dia}`;
+}
+
 const defaultInforme = {
-  cliente: "", contacto: "", direccion: "", fecha: new Date().toISOString().slice(0,10),
+  cliente: "", contacto: "", direccion: "", fecha: fechaLocalHoy(),
   personal: [""],
   cartaGantt: "", tableros: [],
 };
@@ -201,7 +212,7 @@ export default function App() {
   }, [screen]);
 
   function iniciarInforme() {
-    setInforme({ ...defaultInforme, numero: proximoNumero, fecha: new Date().toISOString().slice(0,10), tableros: [] });
+    setInforme({ ...defaultInforme, numero: proximoNumero, fecha: fechaLocalHoy(), tableros: [] });
     setSedeSearch("");
     setScreen("informe");
   }
