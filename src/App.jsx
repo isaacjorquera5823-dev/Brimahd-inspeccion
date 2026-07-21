@@ -409,7 +409,7 @@ export default function App() {
 <title>${inf.numero} — ${inf.cliente}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 14px; background: #f0f0f0; color: #222; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; background: #f0f0f0; color: #222; }
   @media print {
     body { background: white; }
     .no-print { display: none; }
@@ -444,32 +444,30 @@ export default function App() {
 <!-- RESUMEN EJECUTIVO -->
 <div style="background:white;padding:28px 40px;border-bottom:3px solid #f0f0f0;">
   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2c2c2c;border-bottom:2px solid #e8b923;padding-bottom:6px;margin-bottom:18px;">Resumen Ejecutivo</div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
-    <div style="background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;padding:14px;text-align:center;">
-      <div style="font-size:30px;font-weight:700;color:#2c2c2c;">${inf.tableros.length}</div>
-      <div style="font-size:10px;color:#888;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;">Tableros inspeccionados</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+    <div style="border:1px solid #e5e5e5;border-radius:6px;padding:10px 8px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#2c2c2c;">${inf.tableros.length}</div>
+      <div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.3px;margin-top:3px;">Tableros</div>
     </div>
-    <div style="background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;padding:14px;text-align:center;">
-      <div style="font-size:30px;font-weight:700;color:#2c2c2c;">${totalRegistros}</div>
-      <div style="font-size:10px;color:#888;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;">Registros fotográficos</div>
+    <div style="border:1px solid #e5e5e5;border-radius:6px;padding:10px 8px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#2c2c2c;">${totalRegistros}</div>
+      <div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.3px;margin-top:3px;">Registros</div>
     </div>
-    <div style="background:#fde8e8;border:1px solid #e8c8c8;border-radius:8px;padding:14px;text-align:center;">
-      <div style="font-size:30px;font-weight:700;color:#c0392b;">${cambios}</div>
-      <div style="font-size:10px;color:#c0392b;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Cambios de tablero recomendados</div>
+    <div style="border:1px solid #e5e5e5;border-radius:6px;padding:10px 8px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#2c2c2c;">${cambios}</div>
+      <div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.3px;margin-top:3px;">Cambios recomendados</div>
     </div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
-    <div style="background:#c0392b;border-radius:8px;padding:14px;text-align:center;">
-      <div style="font-size:30px;font-weight:700;color:white;">${criticas}</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.8);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;">Obs. Críticas</div>
+    <div style="background:#fde8e8;border:1px solid #f0d5d5;border-radius:6px;padding:10px 8px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#c0392b;">${criticas}</div>
+      <div style="font-size:9px;font-weight:700;color:#c0392b;text-transform:uppercase;letter-spacing:0.3px;margin-top:3px;">Obs. críticas</div>
     </div>
-    <div style="background:#f39c12;border-radius:8px;padding:14px;text-align:center;">
-      <div style="font-size:30px;font-weight:700;color:#7a3800;">${medias}</div>
-      <div style="font-size:10px;color:#7a3800;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Obs. Media</div>
+    <div style="background:#fbf1d8;border:1px solid #e8dcc0;border-radius:6px;padding:10px 8px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#b8860b;">${medias}</div>
+      <div style="font-size:9px;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:0.3px;margin-top:3px;">Obs. media</div>
     </div>
-    <div style="background:#7fb3c8;border-radius:8px;padding:14px;text-align:center;">
-      <div style="font-size:30px;font-weight:700;color:#1a3a45;">${leves}</div>
-      <div style="font-size:10px;color:#1a3a45;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Obs. Leve</div>
+    <div style="background:#e6f2f5;border:1px solid #cfe0e6;border-radius:6px;padding:10px 8px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#1a6b85;">${leves}</div>
+      <div style="font-size:9px;font-weight:700;color:#1a6b85;text-transform:uppercase;letter-spacing:0.3px;margin-top:3px;">Obs. leve</div>
     </div>
   </div>
 </div>
