@@ -535,19 +535,29 @@ ${criticasRows.length > 0 ? `
     const fechaStr = new Date(inf.fecha + "T12:00:00").toISOString().slice(0,10).replace(/-/g,'');
     const nombreArchivo = `${inf.numero} - ${inf.cliente} - ${fechaStr}.html`;
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
 
     const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (esIOS) {
-      // Safari en iOS ignora el atributo "download" con Blob/data URLs: abrimos
-      // el informe en una pestaña nueva y el usuario usa el botón Compartir
-      // de Safari para guardarlo en Archivos, enviarlo por WhatsApp o Email.
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      // Safari en iOS no puede abrir Blob URLs en una pestaña nueva (queda en blanco)
+      // y tampoco respeta el atributo "download". Por eso: 1) abrimos la pestaña
+      // de inmediato (dentro del mismo toque, para que Safari no la bloquee) y
+      // 2) una vez listo el data URL (que sí funciona entre pestañas), la cargamos ahí.
+      const nuevaVentana = window.open('', '_blank');
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (nuevaVentana) {
+          nuevaVentana.location.href = reader.result;
+        } else {
+          // Si el navegador bloqueó la apertura de la pestaña, mostramos el informe en la misma página.
+          window.location.href = reader.result;
+        }
+      };
+      reader.readAsDataURL(blob);
       alert('El informe se abrió en una nueva pestaña. Para guardarlo, toca el ícono de Compartir (⬆) de Safari y elige "Guardar en Archivos" o envíalo directo por WhatsApp/Email.');
     } else {
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = nombreArchivo;
