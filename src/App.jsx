@@ -522,17 +522,29 @@ ${criticasRows.length > 0 ? `
   function descargarHTML(inf, cfg) {
     const html = generarHTMLInforme(inf, cfg);
     const fechaStr = new Date(inf.fecha + "T12:00:00").toISOString().slice(0,10).replace(/-/g,'');
+    const nombreArchivo = `${inf.numero} - ${inf.cliente} - ${fechaStr}.html`;
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const reader = new FileReader();
-    reader.onload = () => {
+    const url = URL.createObjectURL(blob);
+
+    const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    if (esIOS) {
+      // Safari en iOS ignora el atributo "download" con Blob/data URLs: abrimos
+      // el informe en una pestaña nueva y el usuario usa el botón Compartir
+      // de Safari para guardarlo en Archivos, enviarlo por WhatsApp o Email.
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      alert('El informe se abrió en una nueva pestaña. Para guardarlo, toca el ícono de Compartir (⬆) de Safari y elige "Guardar en Archivos" o envíalo directo por WhatsApp/Email.');
+    } else {
       const a = document.createElement('a');
-      a.href = reader.result;
-      a.download = `${inf.numero} - ${inf.cliente} - ${fechaStr}.html`;
+      a.href = url;
+      a.download = nombreArchivo;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    };
-    reader.readAsDataURL(blob);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
   }
 
   function compartirWhatsApp(inf, cfg, fechaFmt) {
