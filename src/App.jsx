@@ -530,7 +530,7 @@ ${criticasRows.length > 0 ? `
     return html;
   }
 
-  function descargarHTML(inf, cfg) {
+  async function descargarHTML(inf, cfg) {
     const html = generarHTMLInforme(inf, cfg);
     const fechaStr = new Date(inf.fecha + "T12:00:00").toISOString().slice(0,10).replace(/-/g,'');
     const nombreArchivo = `${inf.numero} - ${inf.cliente} - ${fechaStr}.html`;
@@ -540,22 +540,26 @@ ${criticasRows.length > 0 ? `
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (esIOS) {
-      // Safari en iOS no puede abrir Blob URLs en una pestaña nueva (queda en blanco)
-      // y tampoco respeta el atributo "download". Por eso: 1) abrimos la pestaña
-      // de inmediato (dentro del mismo toque, para que Safari no la bloquee) y
-      // 2) una vez listo el data URL (que sí funciona entre pestañas), la cargamos ahí.
-      const nuevaVentana = window.open('', '_blank');
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (nuevaVentana) {
-          nuevaVentana.location.href = reader.result;
-        } else {
-          // Si el navegador bloqueó la apertura de la pestaña, mostramos el informe en la misma página.
-          window.location.href = reader.result;
+      // En iOS, tanto los Blob URL como los data URL abiertos en pestaña nueva
+      // fallan de forma intermitente en Safari. La vía confiable es el panel
+      // nativo de Compartir de iOS, que permite Guardar en Archivos, enviar por
+      // WhatsApp, Email, etc. directamente.
+      try {
+        const file = new File([blob], nombreArchivo, { type: 'text/html' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: nombreArchivo });
+          return;
         }
-      };
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // el usuario cerró el panel de compartir
+        // si falla por otro motivo, seguimos con el respaldo de abajo
+      }
+      // Respaldo si el dispositivo no soporta compartir archivos: mostramos el
+      // informe en la misma pestaña como data URL para que use Compartir desde ahí.
+      const reader = new FileReader();
+      reader.onload = () => { window.location.href = reader.result; };
       reader.readAsDataURL(blob);
-      alert('El informe se abrió en una nueva pestaña. Para guardarlo, toca el ícono de Compartir (⬆) de Safari y elige "Guardar en Archivos" o envíalo directo por WhatsApp/Email.');
+      alert('El informe se abrió en esta pestaña. Toca el ícono de Compartir (⬆) de Safari y elige "Guardar en Archivos" o envíalo directo por WhatsApp/Email.');
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
