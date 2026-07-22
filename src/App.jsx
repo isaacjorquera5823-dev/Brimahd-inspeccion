@@ -132,6 +132,42 @@ function useLocalStorage(key, init) {
   return [val, set];
 }
 
+// Clave donde se guarda el "borrador" del informe en curso (autoguardado).
+const BORRADOR_KEY = "brimahd_borrador_informe";
+
+// Comprime y redimensiona una foto antes de guardarla en memoria/estado.
+// Sin esto, una inspección larga con muchas fotos (ej. 40 tableros x 3 fotos)
+// acumula cientos de MB de imágenes sin comprimir en la RAM del navegador,
+// lo que puede hacer que el navegador móvil mate la pestaña y se pierda
+// todo el trabajo. Redimensionamos al ancho/alto máximo indicado y
+// recomprimimos como JPEG, lo que reduce el peso de cada foto entre 80-95%
+// sin pérdida visible en el informe final.
+function comprimirImagen(file, maxDim = 1600, calidad = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", calidad));
+      };
+      img.onerror = () => reject(new Error("No se pudo procesar la imagen"));
+      img.src = ev.target.result;
+    };
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
+}
+
 // ===== Contador correlativo compartido (Firebase Firestore) =====
 // Reemplaza estos valores por el bloque "firebaseConfig" que te entrega la consola de Firebase.
 const firebaseConfig = {
@@ -146,6 +182,27 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const contadorRef = doc(db, "contadores", "informes");
+
+// ===== Control de licencia (kill switch remoto) =====
+// Documento en Firestore: colección "config", documento "licencia".
+// Campos: { activa: true/false, mensaje: "texto opcional a mostrar" }
+// Si el documento no existe, o si hay error de red, se asume ACTIVA
+// (fail-open) para no bloquear accidentalmente por falta de conexión.
+const licenciaRef = doc(db, "config", "licencia");
+
+async function checkLicencia() {
+  try {
+    const snap = await getDoc(licenciaRef);
+    if (!snap.exists()) return { activa: true };
+    const data = snap.data();
+    return {
+      activa: data.activa !== false,
+      mensaje: data.mensaje || "",
+    };
+  } catch {
+    return { activa: true };
+  }
+}
 
 // Muestra el próximo número sin consumirlo (solo para vista previa en pantalla de inicio)
 async function peekNextNumber() {
@@ -206,12 +263,73 @@ export default function App() {
 
   const [proximoNumero, setProximoNumero] = useState("Cargando...");
   const [generando, setGenerando] = useState(false);
+  const [licencia, setLicencia] = useState({ estado: "cargando", mensaje: "" });
+  const [draftDisponible, setDraftDisponible] = useState(null);
+  const draftTimer = useRef(null);
 
   useEffect(() => {
     peekNextNumber().then(setProximoNumero).catch(() => setProximoNumero("Sin conexión"));
   }, [screen]);
 
+  useEffect(() => {
+    checkLicencia().then(r =>
+      setLicencia({ estado: r.activa ? "activa" : "inactiva", mensaje: r.mensaje })
+    );
+  }, []);
+
+  // Al abrir la app, revisa si quedó un borrador guardado de una sesión
+  // anterior (ej. la app se cerró o se cayó a mitad de una inspección).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BORRADOR_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.cliente || (parsed.tableros && parsed.tableros.length > 0))) {
+          setDraftDisponible(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Autoguardado: cada vez que cambia el informe en curso, lo guarda en
+  // localStorage (con un pequeño debounce para no escribir en cada tecla).
+  // Así, si la app se cierra o el navegador la mata por falta de memoria,
+  // al volver a abrirla se puede recuperar el avance en vez de perderlo.
+  useEffect(() => {
+    if (!informe) return;
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      try { localStorage.setItem(BORRADOR_KEY, JSON.stringify(informe)); } catch {}
+    }, 500);
+    return () => clearTimeout(draftTimer.current);
+  }, [informe]);
+
+  function borrarBorrador() {
+    try { localStorage.removeItem(BORRADOR_KEY); } catch {}
+  }
+
+  function continuarBorrador() {
+    setInforme(draftDisponible);
+    setDraftDisponible(null);
+    setScreen("informe");
+  }
+
+  function descartarBorrador() {
+    if (!confirm("¿Descartar este borrador? No se podrá recuperar.")) return;
+    borrarBorrador();
+    setDraftDisponible(null);
+  }
+
+  function finalizarInforme() {
+    if (!confirm("¿Ya descargaste o enviaste este informe? Se borrará el borrador guardado en este celular.")) return;
+    borrarBorrador();
+    setInforme(null);
+    setEnviarScreen(false);
+    setScreen("inicio");
+  }
+
   function iniciarInforme() {
+    setDraftDisponible(null);
     setInforme({ ...defaultInforme, numero: proximoNumero, fecha: fechaLocalHoy(), tableros: [] });
     setSedeSearch("");
     setScreen("informe");
@@ -256,18 +374,22 @@ export default function App() {
     updateInforme("tableros", informe.tableros.filter((_,j) => j !== i));
   }
 
-  function handleRegistroFoto(e, regIdx) {
+  async function handleRegistroFoto(e, regIdx) {
     const file = e.target.files[0];
     if (!file) return;
-    const r = new FileReader();
-    r.onload = ev => {
+    try {
+      const dataUrl = await comprimirImagen(file);
       setTableroEdit(p => {
         const regs = [...p.registros];
-        regs[regIdx] = { ...regs[regIdx], foto: { name: file.name, data: ev.target.result } };
+        regs[regIdx] = { ...regs[regIdx], foto: { name: file.name, data: dataUrl } };
         return { ...p, registros: regs };
       });
-    };
-    r.readAsDataURL(file);
+    } catch (err) {
+      alert("No se pudo procesar la foto. Intenta tomarla de nuevo.");
+    }
+    // Permite volver a seleccionar el mismo archivo (ej. tomar otra foto) sin
+    // que el input "recuerde" el valor anterior.
+    e.target.value = "";
   }
 
   function addRegistro() {
@@ -628,6 +750,26 @@ ${criticasRows.length > 0 ? `
     badge: (c) => ({ display: "inline-block", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: CRITICO_BG[c], color: CRITICO_COLOR[c], textTransform: "uppercase", border: `1px solid ${CRITICO_BORDER[c]}` }),
   };
 
+  // ── Verificando licencia ──
+  if (licencia.estado === "cargando") return (
+    <div style={{ ...s.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div style={{ textAlign: "center", color: "#888", fontSize: 13, fontFamily: FONT }}>Cargando…</div>
+    </div>
+  );
+
+  // ── Servicio suspendido (kill switch remoto) ──
+  if (licencia.estado === "inactiva") return (
+    <div style={{ ...s.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div style={{ ...s.card, textAlign: "center", maxWidth: 340, margin: "0 16px" }}>
+        <div style={{ fontSize: 34, marginBottom: 10 }}>🔒</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: PRIMARY, marginBottom: 8 }}>Servicio suspendido</div>
+        <div style={{ fontSize: 13, color: "#666", lineHeight: 1.5 }}>
+          {licencia.mensaje || "El acceso a esta aplicación se encuentra temporalmente suspendido. Contacta al administrador del servicio para más información."}
+        </div>
+      </div>
+    </div>
+  );
+
   if (screen === "inicio") return (
     <div style={s.app}>
       <div style={s.header}>
@@ -635,6 +777,18 @@ ${criticasRows.length > 0 ? `
         <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("config")}>⚙ Config</button>
       </div>
       <div style={s.body}>
+        {draftDisponible && (
+          <div style={{ ...s.card, background: "#fff9ec", border: "1px solid #ffe082", marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#7c5800", marginBottom: 4 }}>⚠ Informe sin terminar encontrado</div>
+            <div style={{ fontSize: 12, color: "#7c5800", marginBottom: 12, lineHeight: 1.5 }}>
+              {draftDisponible.numero || "Sin número"} · {draftDisponible.cliente || "Sin sede"} · {(draftDisponible.tableros || []).length} tablero{(draftDisponible.tableros || []).length === 1 ? "" : "s"} guardado{(draftDisponible.tableros || []).length === 1 ? "" : "s"}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={{ ...s.btn, ...s.btnPrimary, flex: 1 }} onClick={continuarBorrador}>Continuar informe</button>
+              <button style={{ ...s.btn, ...s.btnGhost, flex: 1 }} onClick={descartarBorrador}>Descartar</button>
+            </div>
+          </div>
+        )}
         <div style={{ ...s.card, textAlign: "center", padding: "32px 16px" }}>
 
           <div style={{ fontSize: 18, fontWeight: 700, color: PRIMARY, marginBottom: 6 }}>App de Inspección</div>
@@ -1040,9 +1194,10 @@ ${criticasRows.length > 0 ? `
       <div style={{ fontFamily: FONT, fontSize: 14, background: BG, height: "100vh", display: "flex", flexDirection: "column" }}>
         <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
           <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px" }} onClick={() => descargarHTML(informe, config)}>⬇ Descargar informe</button>
             <button style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={() => setEnviarScreen(true)}>📤 Enviar</button>
+            <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}>✓ Finalizar</button>
           </div>
         </div>
         <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white" }} />
