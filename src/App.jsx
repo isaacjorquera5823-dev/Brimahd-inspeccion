@@ -12,9 +12,9 @@ const CRITICO_COLOR = { "Crítica": "#ffffff", "Media": "#7a3800", "Leve": "#1a3
 const CRITICO_BG   = { "Crítica": "#c0392b", "Media": "#f39c12", "Leve": "#7fb3c8" };
 const CRITICO_BORDER = { "Crítica": "#a93226", "Media": "#d68910", "Leve": "#5d9db5" };
 const PISOS = ["Piso -3","Piso -2","Piso -1","Zócalo","Piso 1","Piso 2","Piso 3","Piso 4","Piso 5","Piso 6","Piso 7","Piso 8","Piso 9","Piso 10","Piso 11","Piso 12","Piso 13","Piso 14","Piso 15","Azotea"];
-const UBICACIONES = ["Sala","Pasillo","Shaft","Laboratorio","Cancha","Multicancha","Auditorio","Administración","Coordinación Docente","Coordinación de Carrera","Servicios Digitales"];
-const MARCAS = ["LEGRAND","SCHNEIDER","ABB","Otro"];
-const ZONAS = ["Torre 1","Torre 2","Torre 3","Torre 4","CIT","Boulevard","Otro"];
+const UBICACIONES = ["Sala","Pasillo","Shaft","Laboratorio","Cancha","Multicancha","Auditorio","Administración","Coordinación Docente","Coordinación de Carrera","Servicios Digitales","Casino","Sala Eléctrica"];
+const MARCAS = ["LEGRAND","SCHNEIDER","ABB","Merlin Gerin","Otro"];
+const ZONAS = ["Torre 1","Torre 2","Torre 3","Torre 4","CTI","Boulevard","Otro"];
 const OBSERVACIONES_PREDEFINIDAS = [
   // ── Crítica ──
   { texto: "Conexiones fuera de norma", criticidad: "Crítica" },
@@ -39,6 +39,7 @@ const OBSERVACIONES_PREDEFINIDAS = [
   { texto: "Cambiar barra tetrapolar por daño o sin mica", criticidad: "Crítica" },
   { texto: "Existen más de una conexión por punto", criticidad: "Crítica" },
   // ── Media ──
+  { texto: "Conductor suelto en tablero", criticidad: "Media" },
   { texto: "Cambiar terminales ferrulers", criticidad: "Media" },
   { texto: "Chapa en mal estado", criticidad: "Media" },
   { texto: "Luces pilotos en mal estado", criticidad: "Media" },
@@ -121,7 +122,7 @@ const emptyTablero = () => ({
   garantia: false, registros: [],
 });
 const emptyRegistro = () => ({
-  id: Date.now(), foto: null, observaciones: [], cambioTablero: false,
+  id: Date.now(), foto: null, observaciones: [], cambioTablero: false, sinObservaciones: false,
 });
 
 function useLocalStorage(key, init) {
@@ -362,6 +363,8 @@ export default function App() {
     if (!tableroEdit.ubicacion) return alert("Selecciona una ubicación");
     if (tableroEdit.registros.length === 0) return alert("Agrega al menos un registro fotográfico");
     if (tableroEdit.registros.some(r => !r.foto)) return alert("Cada registro debe tener una foto");
+    if (tableroEdit.registros.some(r => !r.sinObservaciones && r.observaciones.length === 0))
+      return alert("Cada registro debe tener al menos una observación, o marcar \"Sin observaciones\"");
     let tableros;
     if (editIdx === null) tableros = [...informe.tableros, tableroEdit];
     else { tableros = [...informe.tableros]; tableros[editIdx] = tableroEdit; }
@@ -415,7 +418,21 @@ export default function App() {
       const reg = regs[regIdx];
       if (reg.observaciones.some(o => o.texto === obs.texto)) return p;
       const newObs = [...reg.observaciones, obs];
-      regs[regIdx] = { ...reg, observaciones: newObs };
+      regs[regIdx] = { ...reg, observaciones: newObs, sinObservaciones: false };
+      return { ...p, registros: regs, criticidad: deriveCriticidad(regs) };
+    });
+  }
+
+  function toggleSinObservaciones(regIdx) {
+    setTableroEdit(p => {
+      const regs = [...p.registros];
+      const reg = regs[regIdx];
+      const nuevoValor = !reg.sinObservaciones;
+      regs[regIdx] = {
+        ...reg,
+        sinObservaciones: nuevoValor,
+        observaciones: nuevoValor ? [] : reg.observaciones,
+      };
       return { ...p, registros: regs, criticidad: deriveCriticidad(regs) };
     });
   }
@@ -486,14 +503,18 @@ export default function App() {
             <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${fg};white-space:nowrap;margin-left:8px;">${obs.criticidad}</span>
           </div>`;
         }).join('');
+        const sinObsHTML = reg.sinObservaciones
+          ? `<div style="padding:5px 0;font-size:12px;color:#2e7d32;font-weight:600;">&#10003; Sin observaciones</div>`
+          : '';
         const cambioHTML = reg.cambioTablero
           ? `<div style="margin-top:8px;padding:8px 12px;background:#fde8e8;border:1px solid #c0392b;border-radius:6px;font-size:12px;font-weight:700;color:#c0392b;">&#9888; Se recomienda cambio de tablero</div>`
           : '';
         return `<div style="border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px;overflow:hidden;">
           <div style="background:#3a3a3a;color:white;padding:6px 12px;font-size:11px;font-weight:700;">Registro N° ${ri+1}</div>
           ${reg.foto ? `<img src="${reg.foto.data}" style="width:100%;max-height:420px;object-fit:contain;display:block;background:#f0f0f0;" />` : '<div style="height:160px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:#f7f7f7;">Sin fotografía</div>'}
-          ${obsHTML || cambioHTML ? `<div style="padding:12px 14px;">
+          ${obsHTML || sinObsHTML || cambioHTML ? `<div style="padding:12px 14px;">
             ${obsHTML}
+            ${sinObsHTML}
             ${cambioHTML}
           </div>` : ''}
         </div>`;
@@ -1110,25 +1131,40 @@ ${criticasRows.length > 0 ? `
                     📷 Tomar foto (obligatorio)
                   </button>
                 )}
-                <button
-                  onClick={() => setObsPicker({ regIdx })}
-                  style={{ ...s.btnGhost, width: "100%", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px" }}>
-                  <span style={{ fontSize: 13, color: reg.observaciones.length > 0 ? PRIMARY : "#aaa" }}>
-                    {reg.observaciones.length > 0 ? `${reg.observaciones.length} observación${reg.observaciones.length > 1 ? "es" : ""} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones…"}
-                  </span>
-                  <span style={{ fontSize: 12, color: "#aaa" }}>›</span>
-                </button>
-                {reg.observaciones.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
-                    {reg.observaciones.map((obs, oi) => (
-                      <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: CRITICO_BG[obs.criticidad], border: `1px solid ${CRITICO_BORDER[obs.criticidad]}`, borderRadius: 7, padding: "7px 10px" }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
-                        <span style={{ flex: 1, fontSize: 12, color: CRITICO_COLOR[obs.criticidad], lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap", opacity: 0.85 }}>{obs.criticidad}</span>
-                        <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: CRITICO_COLOR[obs.criticidad], fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.7 }}>✕</button>
-                      </div>
-                    ))}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "10px 12px", background: reg.sinObservaciones ? "#eaf3ea" : "#f8f8f8", border: `1px solid ${reg.sinObservaciones ? "#2e7d32" : "#e0e0e0"}`, borderRadius: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: reg.sinObservaciones ? 700 : 400, color: reg.sinObservaciones ? "#2e7d32" : "#555" }}>Sin observaciones</span>
+                  <button onClick={() => toggleSinObservaciones(regIdx)}
+                    style={{ width: 52, height: 28, borderRadius: 14, background: reg.sinObservaciones ? "#2e7d32" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+                    <div style={{ position: "absolute", top: 4, left: reg.sinObservaciones ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
+                  </button>
+                </div>
+                {reg.sinObservaciones ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 10, background: "#eaf3ea", border: "1px solid #2e7d32", borderRadius: 8 }}>
+                    <span style={{ fontSize: 13, color: "#2e7d32", fontWeight: 600 }}>✓ Registro marcado sin observaciones</span>
                   </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setObsPicker({ regIdx })}
+                      style={{ ...s.btnGhost, width: "100%", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px" }}>
+                      <span style={{ fontSize: 13, color: reg.observaciones.length > 0 ? PRIMARY : "#aaa" }}>
+                        {reg.observaciones.length > 0 ? `${reg.observaciones.length} observación${reg.observaciones.length > 1 ? "es" : ""} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones…"}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#aaa" }}>›</span>
+                    </button>
+                    {reg.observaciones.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
+                        {reg.observaciones.map((obs, oi) => (
+                          <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: CRITICO_BG[obs.criticidad], border: `1px solid ${CRITICO_BORDER[obs.criticidad]}`, borderRadius: 7, padding: "7px 10px" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
+                            <span style={{ flex: 1, fontSize: 12, color: CRITICO_COLOR[obs.criticidad], lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap", opacity: 0.85 }}>{obs.criticidad}</span>
+                            <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: CRITICO_COLOR[obs.criticidad], fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.7 }}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "10px 12px", background: reg.cambioTablero ? "#fde8e8" : "#f8f8f8", border: `1px solid ${reg.cambioTablero ? "#c0392b" : "#e0e0e0"}`, borderRadius: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: reg.cambioTablero ? 700 : 400, color: reg.cambioTablero ? "#c0392b" : "#555" }}>Se recomienda cambio de tablero</span>
