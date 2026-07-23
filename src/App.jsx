@@ -125,6 +125,61 @@ const emptyRegistro = () => ({
   id: Date.now(), foto: null, observaciones: [], cambioTablero: false, sinObservaciones: false,
 });
 
+// ===== Borrador del informe en curso, guardado en IndexedDB =====
+// localStorage tiene un límite muy bajo por sitio (~5 MB en Safari iOS,
+// 5-10 MB en Chrome/Android). Un informe con 40+ tableros y fotos puede
+// pesar 20-30 MB, muy por sobre ese límite. Cuando se supera,
+// localStorage.setItem() lanza un error y, si no se maneja, el borrador
+// queda "congelado" en la última versión que sí alcanzó a caber — sin
+// avisar nada — mientras el informe real sigue creciendo sin guardarse.
+// IndexedDB no tiene ese límite tan bajo (normalmente cientos de MB o más,
+// según espacio libre del dispositivo), así que es el lugar correcto para
+// guardar el borrador completo de una inspección grande.
+const DB_NAME = "brimahd_db";
+const DB_STORE = "borrador";
+const DB_KEY = "actual";
+const BORRADOR_KEY_LEGACY = "brimahd_borrador_informe"; // clave antigua en localStorage, para migrar borradores previos
+
+function abrirDB() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error("IndexedDB no disponible")); return; }
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(DB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function guardarBorradorDB(draft) {
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).put(draft, DB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function leerBorradorDB() {
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readonly");
+    const req = tx.objectStore(DB_STORE).get(DB_KEY);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function borrarBorradorDB() {
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).delete(DB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 function useLocalStorage(key, init) {
   const [val, setVal] = useState(() => {
     try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : init; } catch { return init; }
@@ -132,9 +187,6 @@ function useLocalStorage(key, init) {
   const set = (v) => { setVal(v); try { localStorage.setItem(key, JSON.stringify(v)); } catch {} };
   return [val, set];
 }
-
-// Clave donde se guarda el "borrador" del informe en curso (autoguardado).
-const BORRADOR_KEY = "brimahd_borrador_informe";
 
 // Comprime y redimensiona una foto antes de guardarla en memoria/estado.
 // Sin esto, una inspección larga con muchas fotos (ej. 40 tableros x 3 fotos)
@@ -167,6 +219,18 @@ function comprimirImagen(file, maxDim = 1600, calidad = 0.72) {
     reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
     reader.readAsDataURL(file);
   });
+}
+
+// Ajusta la calidad/resolución de compresión según cuántas fotos lleva ya el
+// informe en curso. En inspecciones grandes (muchos tableros), comprimir un
+// poco más las fotos siguientes mantiene acotado el peso total del informe
+// y reduce el riesgo de que el navegador se quede sin memoria al generar la
+// vista previa o el HTML final.
+function parametrosCompresion(totalFotosActuales) {
+  if (totalFotosActuales > 200) return { maxDim: 1000, calidad: 0.6 };
+  if (totalFotosActuales > 100) return { maxDim: 1250, calidad: 0.65 };
+  if (totalFotosActuales > 50) return { maxDim: 1450, calidad: 0.7 };
+  return { maxDim: 1600, calidad: 0.72 };
 }
 
 // ===== Contador correlativo compartido (Firebase Firestore) =====
@@ -245,6 +309,69 @@ function Logo({ size = 36, withText = true }) {
   );
 }
 
+// Pantalla de vista previa del informe, separada en su propio componente.
+// Con informes grandes (muchos tableros/fotos), armar el HTML completo con
+// todas las imágenes incrustadas puede tomar varios segundos y bloquear el
+// hilo principal del navegador. Si eso pasa DURANTE el mismo render que
+// dibuja los botones (Descargar/Enviar/Finalizar), el navegador puede
+// quedar "pegado" antes de terminar de pintarlos, dando la sensación de que
+// los botones no existen. Por eso el HTML se calcula de forma diferida
+// (después del primer pintado) y mientras tanto se muestra un indicador de
+// carga, con los botones de navegación (← Editar) ya visibles desde el
+// principio.
+function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, finalizarInforme, generarHTMLInforme, descargarHTML, s }) {
+  const [htmlInforme, setHtmlInforme] = useState(null);
+  const [error, setError] = useState(false);
+
+  // Al entrar a esta pantalla, deja el scroll del navegador arriba del todo.
+  // Si se venía de la lista de tableros (que puede ser muy larga con 40+
+  // tableros y quedar con harto scroll), sin esto el navegador a veces
+  // conserva esa posición de scroll y la barra de botones queda "escondida"
+  // fuera de la vista hasta que el usuario scrollea manualmente.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    setHtmlInforme(null);
+    setError(false);
+    const t = setTimeout(() => {
+      try {
+        const html = generarHTMLInforme(informe, config);
+        setHtmlInforme(html);
+      } catch (e) {
+        setError(true);
+      }
+    }, 30);
+    return () => clearTimeout(t);
+  }, [informe, config]);
+
+  const listo = !!htmlInforme;
+
+  return (
+    <div style={{ fontFamily: FONT, fontSize: 14, background: BG, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", position: "sticky", top: 0, zIndex: 20 }}>
+        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button disabled={!listo} style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => descargarHTML(informe, config)}>⬇ Descargar informe</button>
+          <button disabled={!listo} style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => setEnviarScreen(true)}>📤 Enviar</button>
+          <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}>✓ Finalizar</button>
+        </div>
+      </div>
+      {error ? (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: "#c0392b" }}>No se pudo generar la vista previa. Vuelve a "← Editar" e intenta de nuevo. Si el informe tiene muchas fotos, prueba cerrar otras apps para liberar memoria.</div>
+        </div>
+      ) : !listo ? (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ fontSize: 13, color: "#888" }}>Generando vista previa…</div>
+        </div>
+      ) : (
+        <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white" }} />
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [screen, setScreen] = useState("inicio");
@@ -266,6 +393,7 @@ export default function App() {
   const [generando, setGenerando] = useState(false);
   const [licencia, setLicencia] = useState({ estado: "cargando", mensaje: "" });
   const [draftDisponible, setDraftDisponible] = useState(null);
+  const [autoguardadoError, setAutoguardadoError] = useState(false);
   const draftTimer = useRef(null);
 
   useEffect(() => {
@@ -280,39 +408,69 @@ export default function App() {
 
   // Al abrir la app, revisa si quedó un borrador guardado de una sesión
   // anterior (ej. la app se cerró o se cayó a mitad de una inspección).
+  // Si existe un borrador antiguo en localStorage (de una versión previa de
+  // la app), lo migra a IndexedDB y limpia la clave vieja.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(BORRADOR_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.cliente || (parsed.tableros && parsed.tableros.length > 0))) {
-          setDraftDisponible(parsed);
+    (async () => {
+      try {
+        let draft = await leerBorradorDB();
+        if (!draft) {
+          const raw = localStorage.getItem(BORRADOR_KEY_LEGACY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            draft = parsed && parsed.informe ? parsed : { informe: parsed, tableroEdit: null, editIdx: null, screen: "informe" };
+            await guardarBorradorDB(draft);
+            localStorage.removeItem(BORRADOR_KEY_LEGACY);
+          }
         }
-      }
-    } catch {}
+        if (draft) {
+          const inf = draft.informe;
+          const hayTableroEnEdicion = draft.tableroEdit && draft.tableroEdit.registros && draft.tableroEdit.registros.length > 0;
+          if (inf && (inf.cliente || (inf.tableros && inf.tableros.length > 0) || hayTableroEnEdicion)) {
+            setDraftDisponible(draft);
+          }
+        }
+      } catch {}
+    })();
   }, []);
 
-  // Autoguardado: cada vez que cambia el informe en curso, lo guarda en
-  // localStorage (con un pequeño debounce para no escribir en cada tecla).
-  // Así, si la app se cierra o el navegador la mata por falta de memoria,
-  // al volver a abrirla se puede recuperar el avance en vez de perderlo.
+  // Autoguardado: guarda el informe en curso Y el tablero que se está
+  // editando en ese momento (tableroEdit), no solo los tableros ya
+  // confirmados con "Guardar tablero". Se guarda en IndexedDB (no
+  // localStorage) porque un informe grande con muchas fotos puede pesar
+  // 20-30 MB, muy por sobre el límite de ~5 MB de localStorage en Safari
+  // iOS. Si el guardado falla igualmente, se avisa en pantalla en vez de
+  // fallar en silencio.
   useEffect(() => {
     if (!informe) return;
     if (draftTimer.current) clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(() => {
-      try { localStorage.setItem(BORRADOR_KEY, JSON.stringify(informe)); } catch {}
+      const draft = {
+        informe,
+        tableroEdit: screen === "tablero" ? tableroEdit : null,
+        editIdx: screen === "tablero" ? editIdx : null,
+        screen: screen === "tablero" ? "tablero" : "informe",
+      };
+      guardarBorradorDB(draft).then(() => setAutoguardadoError(false)).catch(() => setAutoguardadoError(true));
     }, 500);
     return () => clearTimeout(draftTimer.current);
-  }, [informe]);
+  }, [informe, tableroEdit, editIdx, screen]);
 
   function borrarBorrador() {
-    try { localStorage.removeItem(BORRADOR_KEY); } catch {}
+    borrarBorradorDB().catch(() => {});
+    try { localStorage.removeItem(BORRADOR_KEY_LEGACY); } catch {}
   }
 
   function continuarBorrador() {
-    setInforme(draftDisponible);
+    setInforme(draftDisponible.informe);
+    if (draftDisponible.screen === "tablero" && draftDisponible.tableroEdit) {
+      setTableroEdit(draftDisponible.tableroEdit);
+      setEditIdx(draftDisponible.editIdx ?? null);
+      setScreen("tablero");
+    } else {
+      setScreen("informe");
+    }
     setDraftDisponible(null);
-    setScreen("informe");
   }
 
   function descartarBorrador() {
@@ -381,7 +539,10 @@ export default function App() {
     const file = e.target.files[0];
     if (!file) return;
     try {
-      const dataUrl = await comprimirImagen(file);
+      const fotosGuardadas = informe.tableros.reduce((s, t) => s + (t.registros || []).filter(r => r.foto).length, 0);
+      const fotosEnEdicion = tableroEdit.registros.filter(r => r.foto).length;
+      const { maxDim, calidad } = parametrosCompresion(fotosGuardadas + fotosEnEdicion);
+      const dataUrl = await comprimirImagen(file, maxDim, calidad);
       setTableroEdit(p => {
         const regs = [...p.registros];
         regs[regIdx] = { ...regs[regIdx], foto: { name: file.name, data: dataUrl } };
@@ -802,7 +963,10 @@ ${criticasRows.length > 0 ? `
           <div style={{ ...s.card, background: "#fff9ec", border: "1px solid #ffe082", marginBottom: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#7c5800", marginBottom: 4 }}>⚠ Informe sin terminar encontrado</div>
             <div style={{ fontSize: 12, color: "#7c5800", marginBottom: 12, lineHeight: 1.5 }}>
-              {draftDisponible.numero || "Sin número"} · {draftDisponible.cliente || "Sin sede"} · {(draftDisponible.tableros || []).length} tablero{(draftDisponible.tableros || []).length === 1 ? "" : "s"} guardado{(draftDisponible.tableros || []).length === 1 ? "" : "s"}
+              {draftDisponible.informe.numero || "Sin número"} · {draftDisponible.informe.cliente || "Sin sede"} · {(draftDisponible.informe.tableros || []).length} tablero{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"} guardado{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"}
+              {draftDisponible.tableroEdit && draftDisponible.tableroEdit.registros && draftDisponible.tableroEdit.registros.length > 0
+                ? ` + 1 tablero en edición (${draftDisponible.tableroEdit.registros.length} registro${draftDisponible.tableroEdit.registros.length === 1 ? "" : "s"})`
+                : ""}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button style={{ ...s.btn, ...s.btnPrimary, flex: 1 }} onClick={continuarBorrador}>Continuar informe</button>
@@ -860,6 +1024,11 @@ ${criticasRows.length > 0 ? `
         <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>Informe {informe.numero}</span>
         <span style={{ fontSize: 11, color: PRIMARY, opacity: 0.7 }}>Datos generales</span>
       </div>
+      {autoguardadoError && (
+        <div style={{ background: "#c0392b", color: "white", padding: "8px 18px", fontSize: 12, lineHeight: 1.4 }}>
+          ⚠ No se pudo guardar el progreso automáticamente en este celular. Si la app se cierra, podrías perder lo hecho desde ahora. Genera y descarga el informe pronto para no perder trabajo.
+        </div>
+      )}
       <div style={s.body}>
         <div style={s.card}>
           <div style={s.sectionTitle}>Cliente</div>
@@ -1225,20 +1394,7 @@ ${criticasRows.length > 0 ? `
   }
 
   if (screen === "preview" && informe) {
-    const htmlInforme = generarHTMLInforme(informe, config);
-    return (
-      <div style={{ fontFamily: FONT, fontSize: 14, background: BG, height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
-          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px" }} onClick={() => descargarHTML(informe, config)}>⬇ Descargar informe</button>
-            <button style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={() => setEnviarScreen(true)}>📤 Enviar</button>
-            <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}>✓ Finalizar</button>
-          </div>
-        </div>
-        <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white" }} />
-      </div>
-    );
+    return <VistaPreviaInforme informe={informe} config={config} setScreen={setScreen} setEnviarScreen={setEnviarScreen} finalizarInforme={finalizarInforme} generarHTMLInforme={generarHTMLInforme} descargarHTML={descargarHTML} s={s} />;
   }
   return null;
 }
