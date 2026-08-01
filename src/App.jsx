@@ -1,16 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, runTransaction } from "firebase/firestore";
+import { ACCENT, ACCENT_TEXT, FONT, CRITICIDAD, getTheme } from "./theme";
+import {
+  Settings, Plus, ArrowLeft, Check, X, Camera, AlertTriangle, Lightbulb,
+  Mail, MessageCircle, Lock, ChevronRight, Download, Send, Sun, Moon, Trash2,
+} from "lucide-react";
 
-const PRIMARY = "#2c2c2c";
-const ACCENT = "#e8b923";
-const BG = "#f8f8f8";
-const FONT = "'Roboto', sans-serif";
-
-const CRITICIDAD = ["Crítica", "Media", "Leve"];
-const CRITICO_COLOR = { "Crítica": "#ffffff", "Media": "#7a3800", "Leve": "#1a3a45" };
-const CRITICO_BG   = { "Crítica": "#c0392b", "Media": "#f39c12", "Leve": "#7fb3c8" };
-const CRITICO_BORDER = { "Crítica": "#a93226", "Media": "#d68910", "Leve": "#5d9db5" };
 const PISOS = ["Piso -3","Piso -2","Piso -1","Zócalo","Piso 1","Piso 2","Piso 3","Piso 4","Piso 5","Piso 6","Piso 7","Piso 8","Piso 9","Piso 10","Piso 11","Piso 12","Piso 13","Piso 14","Piso 15","Azotea"];
 const UBICACIONES = ["Sala","Pasillo","Shaft","Laboratorio","Cancha","Multicancha","Auditorio","Administración","Coordinación Docente","Coordinación de Carrera","Servicios Digitales","Casino","Sala Eléctrica"];
 const MARCAS = ["LEGRAND","SCHNEIDER","ABB","Merlin Gerin","Otro"];
@@ -319,7 +315,7 @@ function Logo({ size = 36, withText = true }) {
 // (después del primer pintado) y mientras tanto se muestra un indicador de
 // carga, con los botones de navegación (← Editar) ya visibles desde el
 // principio.
-function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, finalizarInforme, generarHTMLInforme, descargarHTML, s }) {
+function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, finalizarInforme, generarHTMLInforme, descargarHTML, s, t }) {
   const [htmlInforme, setHtmlInforme] = useState(null);
   const [error, setError] = useState(false);
 
@@ -335,7 +331,7 @@ function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, final
   useEffect(() => {
     setHtmlInforme(null);
     setError(false);
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       try {
         const html = generarHTMLInforme(informe, config);
         setHtmlInforme(html);
@@ -343,28 +339,28 @@ function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, final
         setError(true);
       }
     }, 30);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [informe, config]);
 
   const listo = !!htmlInforme;
 
   return (
-    <div style={{ fontFamily: FONT, fontSize: 14, background: BG, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", position: "sticky", top: 0, zIndex: 20 }}>
-        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
+    <div style={{ fontFamily: FONT, fontSize: 14, background: t.bg, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ background: t.header, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", position: "sticky", top: 0, zIndex: 20 }}>
+        <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}><ArrowLeft size={15} /> Editar</button>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button disabled={!listo} style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => descargarHTML(informe, config)}>⬇ Descargar informe</button>
-          <button disabled={!listo} style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => setEnviarScreen(true)}>📤 Enviar</button>
-          <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}>✓ Finalizar</button>
+          <button disabled={!listo} style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => descargarHTML(informe, config)}><Download size={15} /> Descargar informe</button>
+          <button disabled={!listo} style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => setEnviarScreen(true)}><Send size={15} /> Enviar</button>
+          <button style={{ ...s.btn, background: t.exito.solid, color: "#ffffff", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}><Check size={15} /> Finalizar</button>
         </div>
       </div>
       {error ? (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#c0392b" }}>No se pudo generar la vista previa. Vuelve a "← Editar" e intenta de nuevo. Si el informe tiene muchas fotos, prueba cerrar otras apps para liberar memoria.</div>
+          <div style={{ fontSize: 13, color: t.peligro.text }}>No se pudo generar la vista previa. Vuelve a "← Editar" e intenta de nuevo. Si el informe tiene muchas fotos, prueba cerrar otras apps para liberar memoria.</div>
         </div>
       ) : !listo ? (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ fontSize: 13, color: "#888" }}>Generando vista previa…</div>
+          <div style={{ fontSize: 13, color: t.textDim }}>Generando vista previa…</div>
         </div>
       ) : (
         <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white" }} />
@@ -375,6 +371,10 @@ function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, final
 
 export default function App() {
   const [screen, setScreen] = useState("inicio");
+  // Modo oscuro es el modo por defecto; se guarda en el celular para que
+  // el toggle se recuerde entre sesiones, igual que la config de empresa.
+  const [temaOscuro, setTemaOscuro] = useLocalStorage("brimahd_tema_oscuro", true);
+  const t = getTheme(temaOscuro);
   const [config, setConfig] = useLocalStorage("brimahd_config", defaultConfig);
   const [informe, setInforme] = useState(null);
   const [editIdx, setEditIdx] = useState(null);
@@ -401,9 +401,16 @@ export default function App() {
   }, [screen]);
 
   useEffect(() => {
-    checkLicencia().then(r =>
-      setLicencia({ estado: r.activa ? "activa" : "inactiva", mensaje: r.mensaje })
-    );
+    // La Bienvenida debe alcanzar a verse (fade-in + tagline + puntitos) aunque
+    // la verificación de licencia responda casi al instante en buena conexión.
+    const MIN_SPLASH_MS = 2000;
+    const inicioSplash = Date.now();
+    checkLicencia().then(r => {
+      const falta = MIN_SPLASH_MS - (Date.now() - inicioSplash);
+      setTimeout(() => {
+        setLicencia({ estado: r.activa ? "activa" : "inactiva", mensaje: r.mensaje });
+      }, Math.max(0, falta));
+    });
   }, []);
 
   // Al abrir la app, revisa si quedó un borrador guardado de una sesión
@@ -914,28 +921,46 @@ ${criticasRows.length > 0 ? `
   }
 
   const s = {
-    app: { fontFamily: FONT, fontSize: 14, maxWidth: 480, margin: "0 auto", background: BG, minHeight: "100vh", width: "100%" },
-    header: { background: PRIMARY, color: "white", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" },
+    app: { fontFamily: FONT, fontSize: 14, maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text, minHeight: "100vh", width: "100%" },
+    header: { background: t.header, color: t.headerText, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" },
     body: { padding: "16px" },
-    card: { background: "white", borderRadius: 10, border: "1px solid #e0e0e0", padding: "14px 16px", marginBottom: 12 },
-    label: { fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "block", fontFamily: FONT },
-    input: { width: "100%", padding: "9px 11px", border: "1px solid #e0e0e0", borderRadius: 7, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: "#222" },
-    select: { width: "100%", padding: "9px 11px", border: "1px solid #e0e0e0", borderRadius: 7, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: "#222", background: "white" },
-    textarea: { width: "100%", padding: "9px 11px", border: "1px solid #e0e0e0", borderRadius: 7, fontSize: 16, boxSizing: "border-box", marginBottom: 6, minHeight: 80, resize: "vertical", fontFamily: FONT },
-    btn: { padding: "10px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: FONT },
-    btnPrimary: { background: PRIMARY, color: "white" },
-    btnAccent: { background: ACCENT, color: PRIMARY },
-    btnDanger: { background: "#fde8e8", color: "#c0392b", fontSize: 12, padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: FONT },
-    btnGhost: { background: "transparent", color: PRIMARY, border: "1px solid #e0e0e0", fontSize: 13, padding: "7px 14px", borderRadius: 7, cursor: "pointer", fontFamily: FONT },
+    card: { background: t.surface, borderRadius: 16, border: t.modo === "light" ? `1px solid ${t.border}` : "none", boxShadow: t.cardShadow, padding: "14px 16px", marginBottom: 12 },
+    label: { fontSize: 11, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "block", fontFamily: FONT },
+    input: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: t.text, background: t.inputBg },
+    select: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: t.text, background: t.inputBg },
+    textarea: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 6, minHeight: 80, resize: "vertical", fontFamily: FONT, color: t.text, background: t.inputBg },
+    btn: { padding: "10px 18px", borderRadius: 14, border: "none", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: FONT, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 },
+    btnPrimary: { background: t.modo === "light" ? "#2c2c2c" : "#333333", color: "#ffffff" },
+    btnAccent: { background: ACCENT, color: ACCENT_TEXT, boxShadow: "0 4px 14px rgba(232,185,35,0.35)" },
+    btnDanger: { background: t.peligro.bg, color: t.peligro.text, fontSize: 12, padding: "6px 12px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
+    btnGhost: { background: "transparent", color: t.text, border: `1px solid ${t.border}`, fontSize: 13, padding: "7px 14px", borderRadius: 12, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
     row: { display: "flex", gap: 8, alignItems: "center" },
-    sectionTitle: { fontSize: 12, fontWeight: 700, color: PRIMARY, borderBottom: `2px solid ${ACCENT}`, paddingBottom: 5, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" },
-    badge: (c) => ({ display: "inline-block", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: CRITICO_BG[c], color: CRITICO_COLOR[c], textTransform: "uppercase", border: `1px solid ${CRITICO_BORDER[c]}` }),
+    sectionTitle: { fontSize: 12, fontWeight: 700, color: t.text, borderBottom: `2px solid ${ACCENT}`, paddingBottom: 5, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" },
+    badge: (c) => ({ display: "inline-flex", alignItems: "center", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: t.criticidad[c].bg, color: t.criticidad[c].text, textTransform: "uppercase" }),
   };
 
-  // ── Verificando licencia ──
+  // ── Verificando licencia: pantalla de Bienvenida ──
   if (licencia.estado === "cargando") return (
-    <div style={{ ...s.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-      <div style={{ textAlign: "center", color: "#888", fontSize: 13, fontFamily: FONT }}>Cargando…</div>
+    <div style={{ ...s.app, background: "#2c2c2c", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <style>{`
+        @keyframes brimahdSplashIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes brimahdDotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); } 40% { opacity: 1; background: ${ACCENT}; transform: scale(1); } }
+        @keyframes brimahdGlowPulse { 0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
+        @media (prefers-reduced-motion: reduce) {
+          .brimahd-splash-anim { animation: none !important; }
+          .brimahd-splash-loader span { opacity: 0.6 !important; }
+        }
+      `}</style>
+      <div className="brimahd-splash-anim" style={{ position: "absolute", width: 260, height: 260, top: "42%", left: "50%", transform: "translate(-50%, -50%)", background: "radial-gradient(circle, rgba(232,185,35,0.22) 0%, rgba(232,185,35,0) 70%)", pointerEvents: "none", animation: "brimahdGlowPulse 4s ease-in-out infinite" }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, position: "relative", zIndex: 2 }}>
+        <div className="brimahd-splash-anim" style={{ color: "#ffffff", fontSize: 21, fontWeight: 800, letterSpacing: "-0.01em", fontFamily: FONT, animation: "brimahdSplashIn 0.9s cubic-bezier(.16,.84,.44,1) both" }}>Brimahd</div>
+        <div className="brimahd-splash-anim" style={{ color: ACCENT, fontSize: 11, fontWeight: 600, letterSpacing: "0.02em", fontFamily: FONT, animation: "brimahdSplashIn 0.9s cubic-bezier(.16,.84,.44,1) 0.12s both" }}>Servicios Eléctricos y Telecomunicaciones</div>
+        <div className="brimahd-splash-anim brimahd-splash-loader" style={{ marginTop: 22, display: "flex", gap: 6, animation: "brimahdSplashIn 0.9s cubic-bezier(.16,.84,.44,1) 0.24s both" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.3)", animation: "brimahdDotPulse 1.3s ease-in-out infinite" }} />
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.3)", animation: "brimahdDotPulse 1.3s ease-in-out infinite 0.16s" }} />
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.3)", animation: "brimahdDotPulse 1.3s ease-in-out infinite 0.32s" }} />
+        </div>
+      </div>
     </div>
   );
 
@@ -943,9 +968,9 @@ ${criticasRows.length > 0 ? `
   if (licencia.estado === "inactiva") return (
     <div style={{ ...s.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
       <div style={{ ...s.card, textAlign: "center", maxWidth: 340, margin: "0 16px" }}>
-        <div style={{ fontSize: 34, marginBottom: 10 }}>🔒</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: PRIMARY, marginBottom: 8 }}>Servicio suspendido</div>
-        <div style={{ fontSize: 13, color: "#666", lineHeight: 1.5 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 10, color: t.textDim }}><Lock size={32} /></div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: t.text, marginBottom: 8 }}>Servicio suspendido</div>
+        <div style={{ fontSize: 13, color: t.textDim, lineHeight: 1.5 }}>
           {licencia.mensaje || "El acceso a esta aplicación se encuentra temporalmente suspendido. Contacta al administrador del servicio para más información."}
         </div>
       </div>
@@ -955,14 +980,14 @@ ${criticasRows.length > 0 ? `
   if (screen === "inicio") return (
     <div style={s.app}>
       <div style={s.header}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda. <span style={{ fontSize: 10, color: ACCENT, display: "block", letterSpacing: "0.3px" }}>Servicios Eléctricos</span></span>
-        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("config")}>⚙ Config</button>
+        <span style={{ fontSize: 15, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda. <span style={{ fontSize: 10, color: ACCENT, display: "block", letterSpacing: "0.3px" }}>Servicios Eléctricos</span></span>
+        <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("config")}><Settings size={15} /> Config</button>
       </div>
       <div style={s.body}>
         {draftDisponible && (
-          <div style={{ ...s.card, background: "#fff9ec", border: "1px solid #ffe082", marginBottom: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#7c5800", marginBottom: 4 }}>⚠ Informe sin terminar encontrado</div>
-            <div style={{ fontSize: 12, color: "#7c5800", marginBottom: 12, lineHeight: 1.5 }}>
+          <div style={{ ...s.card, background: t.aviso.bg, border: `1px solid ${t.aviso.border}`, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: t.aviso.text, marginBottom: 4 }}><AlertTriangle size={15} /> Informe sin terminar encontrado</div>
+            <div style={{ fontSize: 12, color: t.aviso.text, marginBottom: 12, lineHeight: 1.5 }}>
               {draftDisponible.informe.numero || "Sin número"} · {draftDisponible.informe.cliente || "Sin sede"} · {(draftDisponible.informe.tableros || []).length} tablero{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"} guardado{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"}
               {draftDisponible.tableroEdit && draftDisponible.tableroEdit.registros && draftDisponible.tableroEdit.registros.length > 0
                 ? ` + 1 tablero en edición (${draftDisponible.tableroEdit.registros.length} registro${draftDisponible.tableroEdit.registros.length === 1 ? "" : "s"})`
@@ -976,14 +1001,14 @@ ${criticasRows.length > 0 ? `
         )}
         <div style={{ ...s.card, textAlign: "center", padding: "32px 16px" }}>
 
-          <div style={{ fontSize: 18, fontWeight: 700, color: PRIMARY, marginBottom: 6 }}>App de Inspección</div>
-          <div style={{ fontSize: 13, color: "#888", marginBottom: 6 }}>Próximo número:</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: t.text, marginBottom: 6 }}>App de Inspección</div>
+          <div style={{ fontSize: 13, color: t.textDim, marginBottom: 6 }}>Próximo número:</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: ACCENT, marginBottom: 20 }}>{proximoNumero}</div>
-          <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: "13px" }} onClick={iniciarInforme}>+ Crear nuevo informe</button>
+          <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: "13px" }} onClick={iniciarInforme}><Plus size={17} /> Crear nuevo informe</button>
         </div>
-        <div style={{ ...s.card, background: "#f0f0f0", border: "none" }}>
-          <div style={{ fontSize: 12, color: "#888", textAlign: "center" }}>
-            <strong style={{ color: PRIMARY }}>{config.empresa}</strong> · {config.rut}<br />
+        <div style={{ ...s.card, background: t.surfaceAlt, border: "none" }}>
+          <div style={{ fontSize: 12, color: t.textDim, textAlign: "center" }}>
+            <strong style={{ color: t.text }}>{config.empresa}</strong> · {config.rut}<br />
             <span style={{ color: ACCENT }}>{config.email}</span>
           </div>
         </div>
@@ -994,10 +1019,23 @@ ${criticasRows.length > 0 ? `
   if (screen === "config") return (
     <div style={s.app}>
       <div style={s.header}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("inicio")}>← Volver</button>
+        <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
+        <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("inicio")}><ArrowLeft size={15} /> Volver</button>
       </div>
       <div style={s.body}>
+        <div style={s.card}>
+          <div style={s.sectionTitle}>Apariencia</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: t.text }}>
+              {temaOscuro ? <Moon size={16} /> : <Sun size={16} />}
+              Modo {temaOscuro ? "oscuro" : "claro"}
+            </span>
+            <button onClick={() => setTemaOscuro(!temaOscuro)}
+              style={{ width: 52, height: 28, borderRadius: 14, background: temaOscuro ? ACCENT : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+              <div style={{ position: "absolute", top: 4, left: temaOscuro ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
+            </button>
+          </div>
+        </div>
         <div style={s.card}>
           <div style={s.sectionTitle}>Datos de la empresa</div>
           <label style={s.label}>Nombre empresa</label>
@@ -1008,7 +1046,7 @@ ${criticasRows.length > 0 ? `
           <input style={s.input} value={config.email} onChange={e => setConfig({ ...config, email: e.target.value })} />
           <label style={s.label}>EPP estándar</label>
           <textarea style={s.textarea} value={config.epp} onChange={e => setConfig({ ...config, epp: e.target.value })} />
-          <button style={{ ...s.btn, ...s.btnPrimary, width: "100%" }} onClick={() => setScreen("inicio")}>Guardar</button>
+          <button style={{ ...s.btn, ...s.btnAccent, width: "100%" }} onClick={() => setScreen("inicio")}>Guardar</button>
         </div>
       </div>
     </div>
@@ -1017,16 +1055,16 @@ ${criticasRows.length > 0 ? `
   if (screen === "informe" && informe) return (
     <div style={s.app}>
       <div style={s.header}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("inicio")}>← Salir</button>
+        <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
+        <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("inicio")}><ArrowLeft size={15} /> Salir</button>
       </div>
       <div style={{ background: ACCENT, padding: "10px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>Informe {informe.numero}</span>
-        <span style={{ fontSize: 11, color: PRIMARY, opacity: 0.7 }}>Datos generales</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT_TEXT }}>Informe {informe.numero}</span>
+        <span style={{ fontSize: 11, color: ACCENT_TEXT, opacity: 0.7 }}>Datos generales</span>
       </div>
       {autoguardadoError && (
-        <div style={{ background: "#c0392b", color: "white", padding: "8px 18px", fontSize: 12, lineHeight: 1.4 }}>
-          ⚠ No se pudo guardar el progreso automáticamente en este celular. Si la app se cierra, podrías perder lo hecho desde ahora. Genera y descarga el informe pronto para no perder trabajo.
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: t.peligro.solid, color: "#ffffff", padding: "8px 18px", fontSize: 12, lineHeight: 1.4 }}>
+          <AlertTriangle size={16} style={{ flexShrink: 0 }} /> No se pudo guardar el progreso automáticamente en este celular. Si la app se cierra, podrías perder lo hecho desde ahora. Genera y descarga el informe pronto para no perder trabajo.
         </div>
       )}
       <div style={s.body}>
@@ -1060,12 +1098,12 @@ ${criticasRows.length > 0 ? `
             <div key={i} style={{ ...s.row, marginBottom: 8 }}>
               <select style={{ ...s.select, marginBottom: 0, flex: 1 }} value={p} onChange={e => updatePersonal(i, e.target.value)}>
                 <option value="">— Seleccionar técnico —</option>
-                {TECNICOS.map(t => <option key={t} value={t}>{t}</option>)}
+                {TECNICOS.map(tec => <option key={tec} value={tec}>{tec}</option>)}
               </select>
-              {informe.personal.length > 1 && <button style={s.btnDanger} onClick={() => removePersonal(i)}>✕</button>}
+              {informe.personal.length > 1 && <button style={s.btnDanger} onClick={() => removePersonal(i)}><X size={13} /></button>}
             </div>
           ))}
-          <button style={{ ...s.btnGhost, width: "100%", marginTop: 4 }} onClick={addPersonal}>+ Agregar técnico</button>
+          <button style={{ ...s.btnGhost, width: "100%", marginTop: 4 }} onClick={addPersonal}><Plus size={14} /> Agregar técnico</button>
         </div>
         <div style={s.card}>
           <div style={s.sectionTitle}>Próxima mantención</div>
@@ -1099,27 +1137,27 @@ ${criticasRows.length > 0 ? `
           <div style={{ ...s.row, justifyContent: "space-between", marginBottom: 12 }}>
             <div style={s.sectionTitle}>Tableros ({informe.tableros.length})</div>
           </div>
-          {informe.tableros.map((t, i) => (
-            <div key={t.id} style={{ border: "1px solid #e0e0e0", borderRadius: 8, marginBottom: 10, overflow: "hidden" }}>
-              <div style={{ background: PRIMARY, color: "white", padding: "9px 13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{(t.zona === "Otro" ? t.zonaOtro : t.zona) || t.ubicacion}</span>
-                <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 10 }}>{t.piso} · {t.ubicacion}{t.numeroSala ? ` ${t.numeroSala}` : ""}</span>
+          {informe.tableros.map((tab, i) => (
+            <div key={tab.id} style={{ border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
+              <div style={{ background: t.header, color: t.headerText, padding: "9px 13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{(tab.zona === "Otro" ? tab.zonaOtro : tab.zona) || tab.ubicacion}</span>
+                <span style={{ fontSize: 11, background: t.headerBtnBg, padding: "2px 8px", borderRadius: 10 }}>{tab.piso} · {tab.ubicacion}{tab.numeroSala ? ` ${tab.numeroSala}` : ""}</span>
               </div>
-              <div style={{ padding: "10px 13px" }}>
-                <span style={s.badge(t.criticidad)}>{t.criticidad}</span>
-                {t.garantia && <span style={{ marginLeft: 6, fontSize: 11, background: "#f1ecfa", color: "#6b4fa0", padding: "3px 8px", borderRadius: 10, fontWeight: 700 }}>En garantía</span>}
-                <div style={{ fontSize: 12, color: "#555", marginTop: 8, lineHeight: 1.5 }}>{t.registros?.length > 0 ? `${t.registros.length} registro${t.registros.length > 1 ? "s" : ""}` : "Sin registros"}</div>
+              <div style={{ padding: "10px 13px", background: t.surface }}>
+                <span style={s.badge(tab.criticidad)}>{tab.criticidad}</span>
+                {tab.garantia && <span style={{ marginLeft: 6, fontSize: 11, background: t.garantia.bg, color: t.garantia.text, padding: "3px 8px", borderRadius: 10, fontWeight: 700 }}>En garantía</span>}
+                <div style={{ fontSize: 12, color: t.textDim, marginTop: 8, lineHeight: 1.5 }}>{tab.registros?.length > 0 ? `${tab.registros.length} registro${tab.registros.length > 1 ? "s" : ""}` : "Sin registros"}</div>
 
                 <div style={{ ...s.row, marginTop: 10, justifyContent: "flex-end" }}>
-                  <button style={s.btnDanger} onClick={() => deleteTablero(i)}>Eliminar</button>
+                  <button style={s.btnDanger} onClick={() => deleteTablero(i)}><Trash2 size={13} /> Eliminar</button>
                   <button style={{ ...s.btnGhost, fontSize: 12, padding: "6px 14px" }} onClick={() => openTablero(i)}>Editar</button>
                 </div>
               </div>
             </div>
           ))}
-          <button style={{ ...s.btn, ...s.btnAccent, width: "100%", marginTop: 4 }} onClick={() => openTablero(null)}>+ Agregar tablero</button>
+          <button style={{ ...s.btn, ...s.btnGhost, width: "100%", marginTop: 4 }} onClick={() => openTablero(null)}><Plus size={15} /> Agregar tablero</button>
         </div>
-        <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 14, fontSize: 15, opacity: generando ? 0.6 : 1 }} onClick={generarInforme} disabled={generando}>{generando ? "Generando…" : "Generar informe →"}</button>
+        <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: 14, fontSize: 15, opacity: generando ? 0.6 : 1 }} onClick={generarInforme} disabled={generando}>{generando ? "Generando…" : "Generar informe →"}</button>
         <div style={{ height: 20 }} />
       </div>
     </div>
@@ -1138,12 +1176,12 @@ ${criticasRows.length > 0 ? `
     return (
       <div style={s.app}>
         <div style={s.header}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }}
-            onClick={() => setObsPicker(null)}>← Volver</button>
+          <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
+          <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }}
+            onClick={() => setObsPicker(null)}><ArrowLeft size={15} /> Volver</button>
         </div>
         <div style={{ background: ACCENT, padding: "10px 18px" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>Registro N° {regIdx + 1} — Observaciones</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT_TEXT }}>Registro N° {regIdx + 1} — Observaciones</span>
         </div>
         <div style={s.body}>
           <input
@@ -1152,19 +1190,19 @@ ${criticasRows.length > 0 ? `
             onChange={e => setObsSearch(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
             placeholder="Buscar observación…"
           />
-          <div style={{ background: "white", borderRadius: 10, border: "1px solid #e0e0e0", overflow: "hidden", marginBottom: 12 }}>
+          <div style={{ background: t.surface, borderRadius: 14, border: `1px solid ${t.border}`, overflow: "hidden", marginBottom: 12 }}>
             {regFiltered.length === 0 && (
-              <div style={{ padding: "16px", textAlign: "center", color: "#aaa", fontSize: 13 }}>Sin resultados</div>
+              <div style={{ padding: "16px", textAlign: "center", color: t.textFaint, fontSize: 13 }}>Sin resultados</div>
             )}
             {regFiltered.map((obs, i) => {
               const already = reg.observaciones.some(o => o.texto === obs.texto);
               return (
                 <div key={i}
                   onClick={() => { if (!already) addObsToRegistro(regIdx, obs); }}
-                  style={{ padding: "12px 14px", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: already ? "#f8f8f8" : "white", opacity: already ? 0.5 : 1, cursor: already ? "default" : "pointer" }}>
-                  <span style={{ flex: 1, fontSize: 13, color: PRIMARY, lineHeight: 1.4 }}>{obs.texto}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10, background: CRITICO_BG[obs.criticidad], color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap", border: `1px solid ${CRITICO_BORDER[obs.criticidad]}` }}>
-                    {already ? "✓" : obs.criticidad}
+                  style={{ padding: "12px 14px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: already ? t.surfaceAlt : t.surface, opacity: already ? 0.6 : 1, cursor: already ? "default" : "pointer" }}>
+                  <span style={{ flex: 1, fontSize: 13, color: t.text, lineHeight: 1.4 }}>{obs.texto}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10, background: t.criticidad[obs.criticidad].bg, color: t.criticidad[obs.criticidad].text, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center" }}>
+                    {already ? <Check size={11} /> : obs.criticidad}
                   </span>
                 </div>
               );
@@ -1187,30 +1225,30 @@ ${criticasRows.length > 0 ? `
               {CRITICIDAD.map(c => <option key={c}>{c}</option>)}
             </select>
             <button
-              style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 12, marginTop: 10 }}
+              style={{ ...s.btn, ...s.btnGhost, width: "100%", padding: 12, marginTop: 10 }}
               onClick={() => {
                 const texto = (obsLibreTexto[regIdx] || "").trim();
                 if (!texto) return;
                 addObsToRegistro(regIdx, { texto, criticidad: obsLibreCrit[regIdx] || "Media", libre: true });
                 setObsLibreTexto(p => { const a = [...p]; a[regIdx] = ""; return a; });
               }}>
-              + Agregar observación
+              <Plus size={15} /> Agregar observación
             </button>
           </div>
           {reg.observaciones.length > 0 && (
             <div style={s.card}>
               <div style={s.sectionTitle}>Seleccionadas ({reg.observaciones.length})</div>
               {reg.observaciones.map((obs, oi) => (
-                <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: CRITICO_BG[obs.criticidad], border: `1px solid ${CRITICO_BORDER[obs.criticidad]}`, borderRadius: 7, padding: "7px 10px", marginBottom: 5 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
-                  <span style={{ flex: 1, fontSize: 12, color: CRITICO_COLOR[obs.criticidad], lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
-                  <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: CRITICO_COLOR[obs.criticidad], fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.7 }}>✕</button>
+                <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: t.criticidad[obs.criticidad].bg, borderRadius: 10, padding: "7px 10px", marginBottom: 5 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: t.criticidad[obs.criticidad].text, minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
+                  <span style={{ flex: 1, fontSize: 12, color: t.criticidad[obs.criticidad].text, lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
+                  <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: t.criticidad[obs.criticidad].text, lineHeight: 1, padding: "0 2px", opacity: 0.7, display: "flex" }}><X size={13} /></button>
                 </div>
               ))}
             </div>
           )}
-          <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 14 }} onClick={() => setObsPicker(null)}>
-            Confirmar observaciones →
+          <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: 14 }} onClick={() => setObsPicker(null)}>
+            Confirmar observaciones
           </button>
           <div style={{ height: 20 }} />
         </div>
@@ -1221,11 +1259,11 @@ ${criticasRows.length > 0 ? `
   return (
     <div style={s.app}>
       <div style={s.header}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("informe")}>← Volver</button>
+        <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
+        <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("informe")}><ArrowLeft size={15} /> Volver</button>
       </div>
       <div style={{ background: ACCENT, padding: "10px 18px" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>{editIdx === null ? "Nuevo tablero" : "Editar tablero"}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT_TEXT }}>{editIdx === null ? "Nuevo tablero" : "Editar tablero"}</span>
       </div>
       <div style={s.body}>
 
@@ -1264,10 +1302,10 @@ ${criticasRows.length > 0 ? `
           {tableroEdit.marca === "Otro" && (
             <input style={s.input} value={tableroEdit.marcaOtro} onChange={e => setTableroEdit(p => ({ ...p, marcaOtro: e.target.value }))} placeholder="Escribe la marca" />
           )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? "#f1ecfa" : "#f8f8f8", border: `1px solid ${tableroEdit.garantia ? "#6b4fa0" : "#e0e0e0"}`, borderRadius: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? "#6b4fa0" : "#555" }}>Tablero en garantía</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? t.garantia.bg : t.surfaceAlt, borderRadius: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? t.garantia.text : t.textDim }}>Tablero en garantía</span>
             <button onClick={() => setTableroEdit(p => ({ ...p, garantia: !p.garantia }))}
-              style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? "#6b4fa0" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+              style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? t.garantia.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
               <div style={{ position: "absolute", top: 4, left: tableroEdit.garantia ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
             </button>
           </div>
@@ -1278,67 +1316,68 @@ ${criticasRows.length > 0 ? `
 
         {tableroEdit.registros.map((reg, regIdx) => {
           return (
-            <div key={reg.id} style={{ border: "1px solid #e0e0e0", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
-              <div style={{ background: PRIMARY, color: "white", padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div key={reg.id} style={{ border: `1px solid ${t.border}`, borderRadius: 14, marginBottom: 12, overflow: "hidden" }}>
+              <div style={{ background: t.header, color: t.headerText, padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>Registro N° {regIdx + 1}</span>
-                <button onClick={() => removeRegistro(regIdx)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}>Eliminar</button>
+                <button onClick={() => removeRegistro(regIdx)} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: t.headerBtnBg, border: "none", color: t.headerText, borderRadius: 8, padding: "3px 10px", fontSize: 12, cursor: "pointer" }}><Trash2 size={12} /> Eliminar</button>
               </div>
-              <div style={{ padding: "14px" }}>
+              <div style={{ padding: "14px", background: t.surface }}>
                 <input ref={el => { if (!fileRef.current) fileRef.current = {}; fileRef.current[regIdx] = el; }} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
                   onChange={e => handleRegistroFoto(e, regIdx)} />
                 {reg.foto ? (
                   <div style={{ position: "relative", marginBottom: 12 }}>
-                    <img src={reg.foto.data} alt="registro" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8, border: "1px solid #e0e0e0" }} />
+                    <img src={reg.foto.data} alt="registro" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 12, border: `1px solid ${t.border}` }} />
                     <button onClick={() => fileRef.current[regIdx]?.click()}
-                      style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
-                      📷 Cambiar foto
+                      style={{ display: "inline-flex", alignItems: "center", gap: 5, position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.65)", color: "white", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
+                      <Camera size={13} /> Cambiar foto
                     </button>
                   </div>
                 ) : (
                   <button onClick={() => fileRef.current[regIdx]?.click()}
-                    style={{ ...s.btnGhost, width: "100%", marginBottom: 12, padding: "20px", border: "2px dashed #e0e0e0", borderRadius: 8, fontSize: 13, color: "#888" }}>
-                    📷 Tomar foto (obligatorio)
+                    style={{ ...s.btnGhost, width: "100%", marginBottom: 12, padding: "20px", border: `2px dashed ${t.border}`, borderRadius: 12, fontSize: 13, color: t.textDim }}>
+                    <Camera size={16} /> Tomar foto (obligatorio)
                   </button>
                 )}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "10px 12px", background: reg.sinObservaciones ? "#eaf3ea" : "#f8f8f8", border: `1px solid ${reg.sinObservaciones ? "#2e7d32" : "#e0e0e0"}`, borderRadius: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: reg.sinObservaciones ? 700 : 400, color: reg.sinObservaciones ? "#2e7d32" : "#555" }}>Sin observaciones</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "10px 12px", background: reg.sinObservaciones ? t.exito.bg : t.surfaceAlt, borderRadius: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: reg.sinObservaciones ? 700 : 400, color: reg.sinObservaciones ? t.exito.text : t.textDim }}>Sin observaciones</span>
                   <button onClick={() => toggleSinObservaciones(regIdx)}
-                    style={{ width: 52, height: 28, borderRadius: 14, background: reg.sinObservaciones ? "#2e7d32" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+                    style={{ width: 52, height: 28, borderRadius: 14, background: reg.sinObservaciones ? t.exito.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
                     <div style={{ position: "absolute", top: 4, left: reg.sinObservaciones ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
                   </button>
                 </div>
                 {reg.sinObservaciones ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 10, background: "#eaf3ea", border: "1px solid #2e7d32", borderRadius: 8 }}>
-                    <span style={{ fontSize: 13, color: "#2e7d32", fontWeight: 600 }}>✓ Registro marcado sin observaciones</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 10, background: t.exito.bg, borderRadius: 12 }}>
+                    <Check size={15} style={{ color: t.exito.text, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: t.exito.text, fontWeight: 600 }}>Registro marcado sin observaciones</span>
                   </div>
                 ) : (
                   <>
                     <button
                       onClick={() => setObsPicker({ regIdx })}
                       style={{ ...s.btnGhost, width: "100%", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px" }}>
-                      <span style={{ fontSize: 13, color: reg.observaciones.length > 0 ? PRIMARY : "#aaa" }}>
+                      <span style={{ fontSize: 13, color: reg.observaciones.length > 0 ? t.text : t.textFaint }}>
                         {reg.observaciones.length > 0 ? `${reg.observaciones.length} observación${reg.observaciones.length > 1 ? "es" : ""} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones…"}
                       </span>
-                      <span style={{ fontSize: 12, color: "#aaa" }}>›</span>
+                      <ChevronRight size={15} style={{ color: t.textFaint }} />
                     </button>
                     {reg.observaciones.length > 0 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
                         {reg.observaciones.map((obs, oi) => (
-                          <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: CRITICO_BG[obs.criticidad], border: `1px solid ${CRITICO_BORDER[obs.criticidad]}`, borderRadius: 7, padding: "7px 10px" }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
-                            <span style={{ flex: 1, fontSize: 12, color: CRITICO_COLOR[obs.criticidad], lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: CRITICO_COLOR[obs.criticidad], whiteSpace: "nowrap", opacity: 0.85 }}>{obs.criticidad}</span>
-                            <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: CRITICO_COLOR[obs.criticidad], fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.7 }}>✕</button>
+                          <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: t.criticidad[obs.criticidad].bg, borderRadius: 10, padding: "7px 10px" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: t.criticidad[obs.criticidad].text, minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
+                            <span style={{ flex: 1, fontSize: 12, color: t.criticidad[obs.criticidad].text, lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: t.criticidad[obs.criticidad].text, whiteSpace: "nowrap", opacity: 0.85 }}>{obs.criticidad}</span>
+                            <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: t.criticidad[obs.criticidad].text, lineHeight: 1, padding: "0 2px", opacity: 0.7, display: "flex" }}><X size={13} /></button>
                           </div>
                         ))}
                       </div>
                     )}
                   </>
                 )}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "10px 12px", background: reg.cambioTablero ? "#fde8e8" : "#f8f8f8", border: `1px solid ${reg.cambioTablero ? "#c0392b" : "#e0e0e0"}`, borderRadius: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: reg.cambioTablero ? 700 : 400, color: reg.cambioTablero ? "#c0392b" : "#555" }}>Se recomienda cambio de tablero</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "10px 12px", background: reg.cambioTablero ? t.peligro.bg : t.surfaceAlt, borderRadius: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: reg.cambioTablero ? 700 : 400, color: reg.cambioTablero ? t.peligro.text : t.textDim }}>Se recomienda cambio de tablero</span>
                   <button onClick={() => { const regs = [...tableroEdit.registros]; regs[regIdx] = { ...reg, cambioTablero: !reg.cambioTablero }; setTableroEdit(p => ({ ...p, registros: regs })); }}
-                    style={{ width: 52, height: 28, borderRadius: 14, background: reg.cambioTablero ? "#c0392b" : "#ccc", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+                    style={{ width: 52, height: 28, borderRadius: 14, background: reg.cambioTablero ? t.peligro.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
                     <div style={{ position: "absolute", top: 4, left: reg.cambioTablero ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
                   </button>
                 </div>
@@ -1347,11 +1386,11 @@ ${criticasRows.length > 0 ? `
           );
         })}
 
-        <button style={{ ...s.btn, ...s.btnAccent, width: "100%", marginBottom: 12 }} onClick={addRegistro}>
-          + Agregar registro
+        <button style={{ ...s.btn, ...s.btnGhost, width: "100%", marginBottom: 12 }} onClick={addRegistro}>
+          <Plus size={15} /> Agregar registro
         </button>
 
-        <button style={{ ...s.btn, ...s.btnPrimary, width: "100%", padding: 14 }} onClick={saveTablero}>Guardar tablero</button>
+        <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: 14 }} onClick={saveTablero}>Guardar tablero</button>
         <div style={{ height: 20 }} />
       </div>
     </div>
@@ -1363,28 +1402,29 @@ ${criticasRows.length > 0 ? `
     return (
       <div style={s.app}>
         <div style={s.header}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setEnviarScreen(false)}>← Volver</button>
+          <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
+          <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setEnviarScreen(false)}><ArrowLeft size={15} /> Volver</button>
         </div>
         <div style={{ background: ACCENT, padding: "10px 18px" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>📤 Enviar informe {informe.numero}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, color: ACCENT_TEXT }}><Send size={15} /> Enviar informe {informe.numero}</span>
         </div>
         <div style={s.body}>
-          <div style={{ ...s.card, background: "#fff9ec", border: "1px solid #ffe082", marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: "#7c5800", lineHeight: 1.6 }}>
-              💡 Asegúrate de haber descargado el informe antes de continuar para poder adjuntarlo.
+          <div style={{ ...s.card, display: "flex", gap: 10, alignItems: "flex-start", background: t.aviso.bg, border: `1px solid ${t.aviso.border}`, marginBottom: 16 }}>
+            <Lightbulb size={17} style={{ color: t.aviso.text, flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 13, color: t.aviso.text, lineHeight: 1.6 }}>
+              Asegúrate de haber descargado el informe antes de continuar para poder adjuntarlo.
             </div>
           </div>
           <div style={s.card}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: PRIMARY, marginBottom: 14 }}>Elige cómo enviar</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 14 }}>Elige cómo enviar</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button style={{ ...s.btn, background: "#25D366", color: "white", width: "100%", padding: 13, fontSize: 14 }}
+              <button style={{ ...s.btn, background: t.whatsapp, color: "white", width: "100%", padding: 13, fontSize: 14 }}
                 onClick={() => compartirWhatsApp(informe, config, fechaFmt)}>
-                📱 Enviar por WhatsApp
+                <MessageCircle size={17} /> Enviar por WhatsApp
               </button>
-              <button style={{ ...s.btn, background: "#0072c6", color: "white", width: "100%", padding: 13, fontSize: 14 }}
+              <button style={{ ...s.btn, ...s.btnGhost, width: "100%", padding: 13, fontSize: 14 }}
                 onClick={() => enviarEmail(informe, config, fechaFmt)}>
-                ✉ Enviar por Email
+                <Mail size={17} /> Enviar por Email
               </button>
             </div>
           </div>
@@ -1394,7 +1434,7 @@ ${criticasRows.length > 0 ? `
   }
 
   if (screen === "preview" && informe) {
-    return <VistaPreviaInforme informe={informe} config={config} setScreen={setScreen} setEnviarScreen={setEnviarScreen} finalizarInforme={finalizarInforme} generarHTMLInforme={generarHTMLInforme} descargarHTML={descargarHTML} s={s} />;
+    return <VistaPreviaInforme informe={informe} config={config} setScreen={setScreen} setEnviarScreen={setEnviarScreen} finalizarInforme={finalizarInforme} generarHTMLInforme={generarHTMLInforme} descargarHTML={descargarHTML} s={s} t={t} />;
   }
   return null;
 }
