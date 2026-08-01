@@ -1,16 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, runTransaction } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, runTransaction } from "firebase/firestore";
+import { PRIMARY, ACCENT, BG, FONT, CRITICIDAD, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER } from "./theme";
+import { generarPDFInforme } from "./pdfInforme";
 
-const PRIMARY = "#2c2c2c";
-const ACCENT = "#e8b923";
-const BG = "#f8f8f8";
-const FONT = "'Roboto', sans-serif";
-
-const CRITICIDAD = ["Crítica", "Media", "Leve"];
-const CRITICO_COLOR = { "Crítica": "#ffffff", "Media": "#7a3800", "Leve": "#1a3a45" };
-const CRITICO_BG   = { "Crítica": "#c0392b", "Media": "#f39c12", "Leve": "#7fb3c8" };
-const CRITICO_BORDER = { "Crítica": "#a93226", "Media": "#d68910", "Leve": "#5d9db5" };
 const PISOS = ["Piso -3","Piso -2","Piso -1","Zócalo","Piso 1","Piso 2","Piso 3","Piso 4","Piso 5","Piso 6","Piso 7","Piso 8","Piso 9","Piso 10","Piso 11","Piso 12","Piso 13","Piso 14","Piso 15","Azotea"];
 const UBICACIONES = ["Sala","Pasillo","Shaft","Laboratorio","Cancha","Multicancha","Auditorio","Administración","Coordinación Docente","Coordinación de Carrera","Servicios Digitales","Casino","Sala Eléctrica"];
 const MARCAS = ["LEGRAND","SCHNEIDER","ABB","Merlin Gerin","Otro"];
@@ -287,6 +280,71 @@ async function reserveNextNumber() {
   return `INF-${String(valorReservado).padStart(4, "0")}`;
 }
 
+// ===== Maestro compartido de observaciones (Firebase Firestore) =====
+// Documento: colección "config", documento "observacionesMaestro".
+// Campos: { aprobadas: [{id,texto,criticidad}], pendientes: [{id,texto,criticidad}] }
+// "aprobadas" se suma a OBSERVACIONES_PREDEFINIDAS en el buscador de todos los
+// técnicos. "pendientes" son observaciones agregadas manualmente que un
+// moderador todavía no revisó -- no se muestran a nadie hasta aprobarse.
+const obsMaestroRef = doc(db, "config", "observacionesMaestro");
+
+// Documento: colección "config", documento "moderacion". Campo: { pin }.
+// Si no existe (primera vez que alguien intenta moderar), se crea con un PIN
+// inicial -- después se puede cambiar directo desde la consola de Firebase.
+const moderacionRef = doc(db, "config", "moderacion");
+const PIN_INICIAL_MODERACION = "0000";
+
+async function cargarObsMaestro() {
+  try {
+    const snap = await getDoc(obsMaestroRef);
+    if (!snap.exists()) return { aprobadas: [], pendientes: [] };
+    const data = snap.data();
+    return { aprobadas: data.aprobadas || [], pendientes: data.pendientes || [] };
+  } catch {
+    return { aprobadas: [], pendientes: [] };
+  }
+}
+
+// Manda una observación nueva a "pendientes" para revisión. Falla en
+// silencio si no hay conexión -- la observación ya quedó guardada en el
+// informe del técnico de todas formas, solo no alcanza a compartirse.
+async function enviarObservacionPendiente(item) {
+  try {
+    await setDoc(obsMaestroRef, { pendientes: arrayUnion(item) }, { merge: true });
+  } catch {
+    // sin conexión u otro error: no bloquea el flujo del informe
+  }
+}
+
+async function verificarPinModeracion(pinIngresado) {
+  const snap = await getDoc(moderacionRef);
+  if (!snap.exists()) {
+    // primera vez: crea el documento con el PIN inicial
+    await setDoc(moderacionRef, { pin: PIN_INICIAL_MODERACION });
+    return pinIngresado === PIN_INICIAL_MODERACION;
+  }
+  return pinIngresado === snap.data().pin;
+}
+
+async function aprobarObservacion(item, aprobadasActuales, pendientesActuales) {
+  const nuevasAprobadas = [...aprobadasActuales, item];
+  const nuevasPendientes = pendientesActuales.filter(p => p.id !== item.id);
+  await updateDoc(obsMaestroRef, { aprobadas: nuevasAprobadas, pendientes: nuevasPendientes });
+  return { aprobadas: nuevasAprobadas, pendientes: nuevasPendientes };
+}
+
+async function rechazarObservacion(item, aprobadasActuales, pendientesActuales) {
+  const nuevasPendientes = pendientesActuales.filter(p => p.id !== item.id);
+  await updateDoc(obsMaestroRef, { pendientes: nuevasPendientes });
+  return { aprobadas: aprobadasActuales, pendientes: nuevasPendientes };
+}
+
+async function eliminarObservacionAprobada(item, aprobadasActuales, pendientesActuales) {
+  const nuevasAprobadas = aprobadasActuales.filter(a => a.id !== item.id);
+  await updateDoc(obsMaestroRef, { aprobadas: nuevasAprobadas });
+  return { aprobadas: nuevasAprobadas, pendientes: pendientesActuales };
+}
+
 function Logo({ size = 36, withText = true }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -313,15 +371,40 @@ function Logo({ size = 36, withText = true }) {
 // Con informes grandes (muchos tableros/fotos), armar el HTML completo con
 // todas las imágenes incrustadas puede tomar varios segundos y bloquear el
 // hilo principal del navegador. Si eso pasa DURANTE el mismo render que
-// dibuja los botones (Descargar/Enviar/Finalizar), el navegador puede
-// quedar "pegado" antes de terminar de pintarlos, dando la sensación de que
-// los botones no existen. Por eso el HTML se calcula de forma diferida
-// (después del primer pintado) y mientras tanto se muestra un indicador de
-// carga, con los botones de navegación (← Editar) ya visibles desde el
-// principio.
-function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, finalizarInforme, generarHTMLInforme, descargarHTML, s }) {
+// dibuja los botones (Enviar/Finalizar), el navegador puede quedar "pegado"
+// antes de terminar de pintarlos, dando la sensación de que los botones no
+// existen. Por eso el HTML se calcula de forma diferida (después del primer
+// pintado) y mientras tanto se muestra un indicador de carga, con los
+// botones de navegación (← Editar) ya visibles desde el principio.
+function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, generarHTMLInforme, enviarInforme, compartirWhatsApp, enviarEmail, s }) {
   const [htmlInforme, setHtmlInforme] = useState(null);
   const [error, setError] = useState(false);
+  const [generandoPDF, setGenerandoPDF] = useState(false);
+
+  // Si el navegador no soporta adjuntar archivos al panel nativo de
+  // compartir (algunos navegadores de escritorio o Android antiguos), el
+  // botón principal solo puede descargar el PDF -- en ese caso se muestran,
+  // como respaldo secundario, enlaces de WhatsApp/Email sin adjunto
+  // automático (hay que adjuntarlo a mano). En un dispositivo que sí lo
+  // soporta (iOS/Android moderno), el único botón ya cubre todo, así que
+  // estos enlaces no se muestran para no sugerir pasos extra innecesarios.
+  const compartirArchivosDisponible = !!(
+    navigator.canShare &&
+    navigator.canShare({ files: [new File([""], "test.pdf", { type: "application/pdf" })] })
+  );
+
+  async function handleEnviar() {
+    setGenerandoPDF(true);
+    try {
+      await enviarInforme(informe, config);
+    } catch (e) {
+      alert("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPDF(false);
+    }
+  }
+
+  const fechaFmt = new Date(informe.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
 
   // Al entrar a esta pantalla, deja el scroll del navegador arriba del todo.
   // Si se venía de la lista de tableros (que puede ser muy larga con 40+
@@ -353,11 +436,17 @@ function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, final
       <div style={{ background: PRIMARY, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", position: "sticky", top: 0, zIndex: 20 }}>
         <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}>← Editar</button>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button disabled={!listo} style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => descargarHTML(informe, config)}>⬇ Descargar informe</button>
-          <button disabled={!listo} style={{ ...s.btn, background: "#e85d26", color: "white", fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => setEnviarScreen(true)}>📤 Enviar</button>
+          <button disabled={!listo || generandoPDF} style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px", opacity: listo && !generandoPDF ? 1 : 0.5 }} onClick={handleEnviar}>{generandoPDF ? "Generando PDF…" : "📤 Enviar informe"}</button>
           <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}>✓ Finalizar</button>
         </div>
       </div>
+      {!compartirArchivosDisponible && (
+        <div style={{ background: "#fff9ec", borderBottom: "1px solid #ffe082", padding: "8px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#7c5800" }}>Tu navegador no adjunta el PDF automáticamente. También puedes:</span>
+          <button style={{ ...s.btnGhost, fontSize: 12, padding: "5px 10px" }} onClick={() => compartirWhatsApp(informe, config, fechaFmt)}>📱 WhatsApp (sin adjunto)</button>
+          <button style={{ ...s.btnGhost, fontSize: 12, padding: "5px 10px" }} onClick={() => enviarEmail(informe, config, fechaFmt)}>✉ Email (sin adjunto)</button>
+        </div>
+      )}
       {error ? (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 13, color: "#c0392b" }}>No se pudo generar la vista previa. Vuelve a "← Editar" e intenta de nuevo. Si el informe tiene muchas fotos, prueba cerrar otras apps para liberar memoria.</div>
@@ -379,7 +468,6 @@ export default function App() {
   const [informe, setInforme] = useState(null);
   const [editIdx, setEditIdx] = useState(null);
   const [tableroEdit, setTableroEdit] = useState(null);
-  const [enviarScreen, setEnviarScreen] = useState(false);
   const [sedeSearch, setSedeSearch] = useState("");
   const [sedeFocused, setSedeFocused] = useState(false);
   const [obsSearch, setObsSearch] = useState([]);
@@ -396,6 +484,12 @@ export default function App() {
   const [autoguardadoError, setAutoguardadoError] = useState(false);
   const draftTimer = useRef(null);
 
+  const [obsMaestro, setObsMaestro] = useState({ aprobadas: [], pendientes: [] });
+  const [pinModeracion, setPinModeracion] = useState("");
+  const [modDesbloqueada, setModDesbloqueada] = useState(false);
+  const [modError, setModError] = useState("");
+  const [modCargando, setModCargando] = useState(false);
+
   useEffect(() => {
     peekNextNumber().then(setProximoNumero).catch(() => setProximoNumero("Sin conexión"));
   }, [screen]);
@@ -404,6 +498,10 @@ export default function App() {
     checkLicencia().then(r =>
       setLicencia({ estado: r.activa ? "activa" : "inactiva", mensaje: r.mensaje })
     );
+  }, []);
+
+  useEffect(() => {
+    cargarObsMaestro().then(setObsMaestro);
   }, []);
 
   // Al abrir la app, revisa si quedó un borrador guardado de una sesión
@@ -483,7 +581,6 @@ export default function App() {
     if (!confirm("¿Ya descargaste o enviaste este informe? Se borrará el borrador guardado en este celular.")) return;
     borrarBorrador();
     setInforme(null);
-    setEnviarScreen(false);
     setScreen("inicio");
   }
 
@@ -838,46 +935,59 @@ ${criticasRows.length > 0 ? `
     return html;
   }
 
-  async function descargarHTML(inf, cfg) {
-    const html = generarHTMLInforme(inf, cfg);
+  // Punto único de "descargar/enviar": intenta primero el panel nativo de
+  // compartir (con el PDF adjunto y el asunto/cuerpo del correo prearmados)
+  // en cualquier dispositivo que lo soporte -- no solo iOS -- para que un
+  // solo toque cubra WhatsApp, Mail, Guardar archivo, AirDrop, Drive, etc.
+  // Devuelve { compartido: true } si el panel nativo se usó (o el usuario lo
+  // cerró sin elegir nada), o { compartido: false } si se cayó al respaldo de
+  // descarga directa -- la pantalla usa ese valor para decidir si mostrar los
+  // enlaces secundarios de WhatsApp/Email sin adjunto.
+  async function enviarInforme(inf, cfg) {
+    const blob = await generarPDFInforme(inf, cfg);
     const fechaStr = new Date(inf.fecha + "T12:00:00").toISOString().slice(0,10).replace(/-/g,'');
-    const nombreArchivo = `${inf.numero} - ${inf.cliente} - ${fechaStr}.html`;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const nombreArchivo = `${inf.numero} - ${inf.cliente} - ${fechaStr}.pdf`;
+    const file = new File([blob], nombreArchivo, { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        const fechaFmt = new Date(inf.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
+        const { asunto, cuerpo } = construirEmailInforme(inf, cfg, fechaFmt);
+        // El panel de compartir le ofrece este mismo title/text a cualquier
+        // app que el usuario elija: si elige Mail, se usa como asunto/cuerpo
+        // del correo (con el PDF ya adjunto); si elige otra app, le llega igual.
+        await navigator.share({ files: [file], title: asunto, text: cuerpo });
+        return { compartido: true };
+      } catch (err) {
+        if (err && err.name === 'AbortError') return { compartido: true }; // el usuario cerró el panel, no es un error
+        // si falla por otro motivo, seguimos con el respaldo de descarga directa
+      }
+    }
 
     const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (esIOS) {
       // En iOS, tanto los Blob URL como los data URL abiertos en pestaña nueva
-      // fallan de forma intermitente en Safari. La vía confiable es el panel
-      // nativo de Compartir de iOS, que permite Guardar en Archivos, enviar por
-      // WhatsApp, Email, etc. directamente.
-      try {
-        const file = new File([blob], nombreArchivo, { type: 'text/html' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: nombreArchivo });
-          return;
-        }
-      } catch (err) {
-        if (err && err.name === 'AbortError') return; // el usuario cerró el panel de compartir
-        // si falla por otro motivo, seguimos con el respaldo de abajo
-      }
-      // Respaldo si el dispositivo no soporta compartir archivos: mostramos el
-      // informe en la misma pestaña como data URL para que use Compartir desde ahí.
+      // fallan de forma intermitente en Safari. La vía confiable es abrir el
+      // PDF en la misma pestaña como data URL para que use el ícono de
+      // Compartir de Safari desde ahí.
       const reader = new FileReader();
       reader.onload = () => { window.location.href = reader.result; };
       reader.readAsDataURL(blob);
-      alert('El informe se abrió en esta pestaña. Toca el ícono de Compartir (⬆) de Safari y elige "Guardar en Archivos" o envíalo directo por WhatsApp/Email.');
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = nombreArchivo;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      alert('El informe se abrió en esta pestaña. Toca el ícono de Compartir (⬆) de Safari para enviarlo o guardarlo.');
+      return { compartido: false };
     }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return { compartido: false };
   }
 
   function compartirWhatsApp(inf, cfg, fechaFmt) {
@@ -885,31 +995,63 @@ ${criticasRows.length > 0 ? `
     window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
   }
 
-  function enviarEmail(inf, cfg, fechaFmt) {
+  // Arma el asunto/cuerpo del correo del informe. Se usa tanto para el
+  // mailto: de "Enviar por Email" como para el "text"/"title" que se le pasa
+  // al panel nativo de compartir (navigator.share) al descargar el PDF, para
+  // que si el usuario elige Mail ahí, el correo salga con el PDF adjunto Y el
+  // mismo asunto/cuerpo prearmado.
+  function construirEmailInforme(inf, cfg, fechaFmt) {
     const asunto = `Informe Mantención Eléctrica ${inf.numero} - ${inf.cliente}`;
 
-    // Build critical observations list for email body
-    const criticas = [];
+    // Lista de observaciones críticas para el cuerpo del correo, agrupada por
+    // tablero (la ubicación aparece una sola vez por grupo, no repetida en
+    // cada línea) y acotada a un máximo, para que informes grandes (40-70+
+    // tableros) no generen un correo interminable. El mailto: es texto plano
+    // -- no admite tabla ni colores -- así que esto es lo más ordenado posible
+    // dentro de esa limitación; el detalle completo y con colores ya vive en
+    // la tabla de críticos del PDF adjunto.
+    const LIMITE_CRITICAS_EMAIL = 25;
+    const gruposCriticas = [];
+    let totalCriticas = 0;
     inf.tableros.forEach(t => {
       const zonaTexto = t.zona === "Otro" ? t.zonaOtro : t.zona;
       const ubicLabel = [zonaTexto, t.piso, t.ubicacion, t.numeroSala].filter(Boolean).join(' — ');
+      const items = [];
       (t.registros||[]).forEach((reg, ri) => {
         reg.observaciones.filter(o => o.criticidad === "Crítica").forEach(obs => {
-          criticas.push(`  • [${ubicLabel} / Registro N°${ri+1}] ${obs.texto}`);
+          items.push(`  • Registro N°${ri+1}: ${obs.texto}`);
         });
       });
+      if (items.length > 0) {
+        gruposCriticas.push({ ubicLabel, items });
+        totalCriticas += items.length;
+      }
     });
 
-    const seccionCriticas = criticas.length > 0
-      ? `\n⚠ OBSERVACIONES CRÍTICAS (${criticas.length}):\n\n${criticas.map((c, i) => {
-          const parts = c.match(/^\s+•\s+\[(.+?)\s+\/\s+Registro N°(\d+)\]\s+(.+)$/);
-          if (!parts) return c;
-          return `${i+1}. ${parts[1]} | Registro N°${parts[2]}\n   ${parts[3]}`;
-        }).join("\n\n")}\n\nEstas observaciones requieren atención prioritaria. Se recomienda gestionar su corrección en el corto plazo para evitar riesgos a la instalación y a las personas.\n`
-      : "";
+    let seccionCriticas = "";
+    if (totalCriticas > 0) {
+      let mostradas = 0;
+      const bloques = [];
+      for (const g of gruposCriticas) {
+        if (mostradas >= LIMITE_CRITICAS_EMAIL) break;
+        const itemsAMostrar = g.items.slice(0, LIMITE_CRITICAS_EMAIL - mostradas);
+        bloques.push(`${g.ubicLabel}\n${itemsAMostrar.join("\n")}`);
+        mostradas += itemsAMostrar.length;
+      }
+      const faltan = totalCriticas - mostradas;
+      const notaFaltan = faltan > 0
+        ? `\n\n… + ${faltan} ${faltan === 1 ? "observación crítica" : "observaciones críticas"} más — ver el detalle completo en el PDF adjunto.`
+        : "";
+      seccionCriticas = `\n⚠ OBSERVACIONES CRÍTICAS (${totalCriticas}):\n\n${bloques.join("\n\n")}${notaFaltan}\n\nEstas observaciones requieren atención prioritaria. Se recomienda gestionar su corrección en el corto plazo para evitar riesgos a la instalación y a las personas.\n`;
+    }
 
     const cuerpo = `Estimado/a Sr./Sra. ${inf.contacto || ""},\n\nJunto con saludar, adjunto el informe de mantención preventiva de tableros eléctricos correspondiente a:\n\nCliente: ${inf.cliente}\nFecha: ${fechaFmt}\nN° Informe: ${inf.numero}\nTableros inspeccionados: ${inf.tableros.length}\nPersonal: ${inf.personal.filter(Boolean).join(", ")}\n${inf.cartaGantt ? "Próxima mantención: "+inf.cartaGantt+"\n" : ""}${seccionCriticas}\nEl detalle completo con fotografías y observaciones se encuentra en el archivo adjunto.\n\nQuedamos a su disposición ante cualquier consulta.\n\nSaludos cordiales,\n${cfg.empresa}\n${cfg.rut}\n${cfg.email}`;
 
+    return { asunto, cuerpo };
+  }
+
+  function enviarEmail(inf, cfg, fechaFmt) {
+    const { asunto, cuerpo } = construirEmailInforme(inf, cfg, fechaFmt);
     window.location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
   }
 
@@ -1010,7 +1152,105 @@ ${criticasRows.length > 0 ? `
           <textarea style={s.textarea} value={config.epp} onChange={e => setConfig({ ...config, epp: e.target.value })} />
           <button style={{ ...s.btn, ...s.btnPrimary, width: "100%" }} onClick={() => setScreen("inicio")}>Guardar</button>
         </div>
+        <div style={s.card}>
+          <div style={s.sectionTitle}>Observaciones</div>
+          <button style={{ ...s.btnGhost, width: "100%" }} onClick={() => { setModDesbloqueada(false); setPinModeracion(""); setModError(""); setScreen("moderacion"); }}>
+            🔒 Moderar observaciones{obsMaestro.pendientes.length > 0 ? ` (${obsMaestro.pendientes.length} pendiente${obsMaestro.pendientes.length === 1 ? "" : "s"})` : ""}
+          </button>
+        </div>
       </div>
+    </div>
+  );
+
+  if (screen === "moderacion") return (
+    <div style={s.app}>
+      <div style={s.header}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
+        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("config")}>← Volver</button>
+      </div>
+      <div style={{ background: ACCENT, padding: "10px 18px" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>🔒 Moderar observaciones</span>
+      </div>
+      {!modDesbloqueada ? (
+        <div style={s.body}>
+          <div style={s.card}>
+            <div style={s.sectionTitle}>Ingresa el PIN</div>
+            <input
+              style={s.input}
+              type="password"
+              inputMode="numeric"
+              value={pinModeracion}
+              onChange={e => setPinModeracion(e.target.value)}
+              placeholder="PIN"
+            />
+            {modError && <div style={{ fontSize: 12, color: "#c0392b", marginBottom: 10 }}>{modError}</div>}
+            <button
+              style={{ ...s.btn, ...s.btnPrimary, width: "100%" }}
+              disabled={modCargando}
+              onClick={async () => {
+                setModCargando(true);
+                setModError("");
+                try {
+                  const ok = await verificarPinModeracion(pinModeracion.trim());
+                  if (ok) setModDesbloqueada(true);
+                  else setModError("PIN incorrecto");
+                } catch {
+                  setModError("No se pudo verificar el PIN. Revisa tu conexión.");
+                } finally {
+                  setModCargando(false);
+                }
+              }}>
+              {modCargando ? "Verificando…" : "Entrar"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={s.body}>
+          <div style={s.card}>
+            <div style={s.sectionTitle}>Pendientes ({obsMaestro.pendientes.length})</div>
+            {obsMaestro.pendientes.length === 0 && (
+              <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", padding: "8px 0" }}>Sin observaciones pendientes</div>
+            )}
+            {obsMaestro.pendientes.map(item => (
+              <div key={item.id} style={{ padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <span style={{ flex: 1, fontSize: 13, color: PRIMARY, lineHeight: 1.4 }}>{item.texto}</span>
+                  <span style={s.badge(item.criticidad)}>{item.criticidad}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "6px 12px", flex: 1 }}
+                    onClick={async () => setObsMaestro(await aprobarObservacion(item, obsMaestro.aprobadas, obsMaestro.pendientes))}>
+                    ✓ Aprobar
+                  </button>
+                  <button style={{ ...s.btnDanger, flex: 1 }}
+                    onClick={async () => setObsMaestro(await rechazarObservacion(item, obsMaestro.aprobadas, obsMaestro.pendientes))}>
+                    ✕ Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={s.card}>
+            <div style={s.sectionTitle}>Aprobadas ({obsMaestro.aprobadas.length})</div>
+            {obsMaestro.aprobadas.length === 0 && (
+              <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", padding: "8px 0" }}>Sin observaciones aprobadas todavía</div>
+            )}
+            {obsMaestro.aprobadas.map(item => (
+              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
+                <span style={{ flex: 1, fontSize: 13, color: PRIMARY, lineHeight: 1.4 }}>{item.texto}</span>
+                <span style={s.badge(item.criticidad)}>{item.criticidad}</span>
+                <button style={s.btnDanger}
+                  onClick={async () => {
+                    if (!confirm("¿Eliminar esta observación del maestro? No afecta informes ya generados.")) return;
+                    setObsMaestro(await eliminarObservacionAprobada(item, obsMaestro.aprobadas, obsMaestro.pendientes));
+                  }}>
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1131,7 +1371,10 @@ ${criticasRows.length > 0 ? `
   if (obsPicker !== null) {
     const regIdx = obsPicker.regIdx;
     const regSearch = obsSearch[regIdx] || "";
-    const regFiltered = OBSERVACIONES_PREDEFINIDAS.filter(o =>
+    // Lista fija + las observaciones que otros técnicos agregaron y ya fueron
+    // aprobadas en la moderación (compartidas vía Firestore).
+    const obsCombinadas = [...OBSERVACIONES_PREDEFINIDAS, ...obsMaestro.aprobadas];
+    const regFiltered = obsCombinadas.filter(o =>
       o.texto.toLowerCase().includes(regSearch.toLowerCase())
     );
     const reg = tableroEdit.registros[regIdx];
@@ -1191,8 +1434,19 @@ ${criticasRows.length > 0 ? `
               onClick={() => {
                 const texto = (obsLibreTexto[regIdx] || "").trim();
                 if (!texto) return;
-                addObsToRegistro(regIdx, { texto, criticidad: obsLibreCrit[regIdx] || "Media", libre: true });
+                const criticidad = obsLibreCrit[regIdx] || "Media";
+                addObsToRegistro(regIdx, { texto, criticidad, libre: true });
                 setObsLibreTexto(p => { const a = [...p]; a[regIdx] = ""; return a; });
+                // Si no está ya en la lista fija ni en las aprobadas/pendientes
+                // del maestro compartido, la manda a moderación para que otros
+                // técnicos puedan verla en futuros informes una vez aprobada.
+                const yaExiste = obsCombinadas.some(o => o.texto.toLowerCase() === texto.toLowerCase())
+                  || obsMaestro.pendientes.some(o => o.texto.toLowerCase() === texto.toLowerCase());
+                if (!yaExiste) {
+                  const nuevoItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, texto, criticidad };
+                  setObsMaestro(p => ({ ...p, pendientes: [...p.pendientes, nuevoItem] }));
+                  enviarObservacionPendiente(nuevoItem);
+                }
               }}>
               + Agregar observación
             </button>
@@ -1358,43 +1612,8 @@ ${criticasRows.length > 0 ? `
   );
   }
 
-  if (screen === "preview" && enviarScreen && informe) {
-    const fechaFmt = new Date(informe.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
-    return (
-      <div style={s.app}>
-        <div style={s.header}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-          <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setEnviarScreen(false)}>← Volver</button>
-        </div>
-        <div style={{ background: ACCENT, padding: "10px 18px" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>📤 Enviar informe {informe.numero}</span>
-        </div>
-        <div style={s.body}>
-          <div style={{ ...s.card, background: "#fff9ec", border: "1px solid #ffe082", marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: "#7c5800", lineHeight: 1.6 }}>
-              💡 Asegúrate de haber descargado el informe antes de continuar para poder adjuntarlo.
-            </div>
-          </div>
-          <div style={s.card}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: PRIMARY, marginBottom: 14 }}>Elige cómo enviar</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button style={{ ...s.btn, background: "#25D366", color: "white", width: "100%", padding: 13, fontSize: 14 }}
-                onClick={() => compartirWhatsApp(informe, config, fechaFmt)}>
-                📱 Enviar por WhatsApp
-              </button>
-              <button style={{ ...s.btn, background: "#0072c6", color: "white", width: "100%", padding: 13, fontSize: 14 }}
-                onClick={() => enviarEmail(informe, config, fechaFmt)}>
-                ✉ Enviar por Email
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (screen === "preview" && informe) {
-    return <VistaPreviaInforme informe={informe} config={config} setScreen={setScreen} setEnviarScreen={setEnviarScreen} finalizarInforme={finalizarInforme} generarHTMLInforme={generarHTMLInforme} descargarHTML={descargarHTML} s={s} />;
+    return <VistaPreviaInforme informe={informe} config={config} setScreen={setScreen} finalizarInforme={finalizarInforme} generarHTMLInforme={generarHTMLInforme} enviarInforme={enviarInforme} compartirWhatsApp={compartirWhatsApp} enviarEmail={enviarEmail} s={s} />;
   }
   return null;
 }
