@@ -550,7 +550,7 @@ export default function App() {
         screen: screen === "tablero" ? "tablero" : "informe",
       };
       guardarBorradorDB(draft).then(() => setAutoguardadoError(false)).catch(() => setAutoguardadoError(true));
-    }, 500);
+    }, 1500);
     return () => clearTimeout(draftTimer.current);
   }, [informe, tableroEdit, editIdx, screen]);
 
@@ -943,10 +943,16 @@ ${criticasRows.length > 0 ? `
   // cerró sin elegir nada), o { compartido: false } si se cayó al respaldo de
   // descarga directa -- la pantalla usa ese valor para decidir si mostrar los
   // enlaces secundarios de WhatsApp/Email sin adjunto.
+  // Nombre base del informe (sin extensión): se usa tanto para el archivo
+  // descargado/adjunto como para el asunto del correo, para que ambos coincidan.
+  function nombreBaseInforme(inf) {
+    const fechaStr = new Date(inf.fecha + "T12:00:00").toISOString().slice(0,10).replace(/-/g,'');
+    return `${inf.numero} - ${inf.cliente} - ${fechaStr}`;
+  }
+
   async function enviarInforme(inf, cfg) {
     const blob = await generarPDFInforme(inf, cfg);
-    const fechaStr = new Date(inf.fecha + "T12:00:00").toISOString().slice(0,10).replace(/-/g,'');
-    const nombreArchivo = `${inf.numero} - ${inf.cliente} - ${fechaStr}.pdf`;
+    const nombreArchivo = `${nombreBaseInforme(inf)}.pdf`;
     const file = new File([blob], nombreArchivo, { type: 'application/pdf' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -1001,7 +1007,7 @@ ${criticasRows.length > 0 ? `
   // que si el usuario elige Mail ahí, el correo salga con el PDF adjunto Y el
   // mismo asunto/cuerpo prearmado.
   function construirEmailInforme(inf, cfg, fechaFmt) {
-    const asunto = `Informe Mantención Eléctrica ${inf.numero} - ${inf.cliente}`;
+    const asunto = nombreBaseInforme(inf);
 
     // Lista de observaciones críticas para el cuerpo del correo, agrupada por
     // tablero (la ubicación aparece una sola vez por grupo, no repetida en
