@@ -104,7 +104,12 @@ export function calcularEstadisticas(inf) {
 export function dibujarTituloSeccion(ctx, texto, opts = {}) {
   const { doc } = ctx;
   const fontSize = opts.fontSize || 11;
-  asegurarEspacio(ctx, 12);
+  // Si se indica cuánto mide el bloque que sigue inmediatamente (p.ej. el
+  // primer tablero de "Detalle por Tablero"), se reserva junto con el título:
+  // así nunca queda el título solo al final de una página con el contenido
+  // real recién arrancando en la siguiente.
+  const necesario = 12 + (opts.siguienteMinH || 0);
+  asegurarEspacio(ctx, Math.min(necesario, MAX_Y - MARGIN - 2));
   doc.setFont("helvetica", "bold");
   doc.setFontSize(fontSize);
   const [pr, pg, pb] = hexToRgb(PRIMARY);
@@ -398,6 +403,28 @@ function dibujarRegistro(ctx, registro, indice) {
   ctx.y += 5;
 }
 
+// Mide cuánto ocupa el header + metadatos + primer registro de un tablero,
+// para poder reservar ese bloque completo con asegurarEspacio (evita que el
+// header quede huérfano al final de una página). La usa dibujarTablero para
+// sí mismo, y dibujarTituloSeccion para el título "Detalle por Tablero" que
+// lo precede, así tampoco el título queda huérfano del tablero.
+function medirLookaheadTablero(doc, tablero) {
+  const metaItemsPrevia = [
+    tablero.nombreTablero && `Nombre tablero: ${tablero.nombreTablero}`,
+    tablero.proteccionGeneral && `Protección general: ${tablero.proteccionGeneral}`,
+    (tablero.marca === "Otro" ? tablero.marcaOtro : tablero.marca) && `Marca: ${tablero.marca === "Otro" ? tablero.marcaOtro : tablero.marca}`,
+  ].filter(Boolean);
+  const headerH0 = 12;
+  const metaH0 = metaItemsPrevia.length
+    ? medirTexto(doc, metaItemsPrevia.join("   ·   "), CONTENT_W - 8, 8).height + 5
+    : 0;
+  let lookaheadH = headerH0 + metaH0 + 4;
+  if (tablero.registros && tablero.registros.length > 0) {
+    lookaheadH += medirRegistro(doc, tablero.registros[0]).totalH;
+  }
+  return lookaheadH;
+}
+
 export function dibujarTablero(ctx, tablero, indice) {
   const { doc } = ctx;
   const zonaTexto = tablero.zona === "Otro" ? tablero.zonaOtro : tablero.zona;
@@ -408,14 +435,7 @@ export function dibujarTablero(ctx, tablero, indice) {
     tablero.proteccionGeneral && `Protección general: ${tablero.proteccionGeneral}`,
     marcaTexto && `Marca: ${marcaTexto}`,
   ].filter(Boolean);
-  const headerH0 = 12;
-  const metaH0 = metaItemsPrevia.length
-    ? medirTexto(doc, metaItemsPrevia.join("   ·   "), CONTENT_W - 8, 8).height + 5
-    : 0;
-  let lookaheadH = headerH0 + metaH0 + 4;
-  if (tablero.registros && tablero.registros.length > 0) {
-    lookaheadH += medirRegistro(doc, tablero.registros[0]).totalH;
-  }
+  const lookaheadH = medirLookaheadTablero(doc, tablero);
   // Reserva el header + metadatos junto con el primer registro: si no entran
   // juntos en lo que queda de página, se pasa el bloque completo a la
   // siguiente en vez de dejar el header del tablero solo, sin contenido,
@@ -582,7 +602,8 @@ export async function generarPDFInforme(inf, cfg) {
   dibujarPortada(ctx, inf, cfg, fechaFmt);
   dibujarResumenEjecutivo(ctx, stats, inf);
   dibujarPersonalYEPP(ctx, inf, cfg);
-  dibujarTituloSeccion(ctx, "Detalle por Tablero", { fontSize: 11 });
+  const siguienteMinH = inf.tableros.length > 0 ? medirLookaheadTablero(doc, inf.tableros[0]) : 0;
+  dibujarTituloSeccion(ctx, "Detalle por Tablero", { fontSize: 11, siguienteMinH });
 
   for (let i = 0; i < inf.tableros.length; i++) {
     dibujarTablero(ctx, inf.tableros[i], i);
