@@ -96,6 +96,17 @@ Isaac es el desarrollador y dueño del código/IP. Emanuel Madrid Valenzuela (du
 - **Vite bloquea hosts desconocidos por defecto**: para probar la app por un túnel HTTPS (cloudflared/ngrok) hay que agregar el host a `server.allowedHosts` en `vite.config.ts`, si no tira 403 "Blocked request". (Esto es sobre la herramienta de desarrollo, no sobre la app en sí.)
 - **Para traer el código fuente actual**: `curl -s "https://raw.githubusercontent.com/isaacjorquera5823-dev/Brimahd-inspeccion/main/src/App.jsx"` — la API de GitHub para listar directorios tiene rate limit agresivo, evitarla.
 
+## 🎨 En pruebas — rama `diseno-visual` (NO fusionada a `main`, NO probada en producción)
+Todo lo de esta sección vive **solo** en la rama `diseno-visual`. Lo que corre hoy en producción (`main`) sigue con el diseño original descrito en "Diseño" arriba: modo claro fijo (`color-scheme: light` forzado, sin toggle), sin pantalla de Bienvenida, iconos emoji en vez de línea. Implementa el objetivo descrito en "Lenguaje visual / diseño" arriba — ya está en código y commiteado en esta rama, pero pendiente de que Isaac lo pruebe (celular/iPhone Safari) y confirme explícitamente la fusión a `main`.
+
+- **Sistema de tema** (`src/theme.js`, archivo nuevo en esta rama): paleta clara/oscura completa (`getTheme(modoOscuro)`), modo oscuro **por defecto** con toggle persistente (`useLocalStorage`) en la pantalla Config.
+- El dorado (`#e8b923`) es el único acento decorativo en toda la app; los colores semánticos (éxito, peligro, garantía, criticidad, WhatsApp) están exentos porque le dicen algo al usuario, no son decorativos.
+- Iconos `lucide-react` reemplazan los emojis en las 8 pantallas de la app.
+- Tarjetas con radio de 16px, badges de criticidad con fondo suave del mismo tono del texto (antes: fondo sólido + texto blanco/negro).
+- **Pantalla de Bienvenida (splash) nueva**: reemplaza el "Cargando…" mientras se verifica la licencia. Fondo carbón fijo (`#2c2c2c`, no depende del toggle), resplandor dorado animado, nombre + tagline con fade-in, tres puntitos de carga. Mínimo 2 segundos visible aunque `checkLicencia()` responda antes (para que no desaparezca antes de alcanzar a verse). Sin ícono/logo — pendiente el logo definitivo. Respeta `prefers-reduced-motion`.
+- `generarHTMLInforme()` (el documento que se descarga/envía por correo) **no se tocó a propósito** — este rediseño es solo de la UI de la app, no del documento final del informe.
+- Commits: `53f29ac`.
+
 ## 🧪 En pruebas — rama `test-pdf` (NO fusionada a `main`, NO probada en producción)
 Todo lo de esta sección vive **solo** en la rama `test-pdf` del repo. Lo que corre hoy en producción (`main`, `https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/`) sigue exactamente como está descrito en las secciones de arriba: descarga en HTML, sin maestro de observaciones, sin botón único de enviar. No tratar nada de lo siguiente como parte de la app terminada — es trabajo en curso, pendiente de que Isaac lo pruebe en su celular y confirme explícitamente la fusión a `main`.
 
@@ -114,6 +125,6 @@ Todo lo de esta sección vive **solo** en la rama `test-pdf` del repo. Lo que co
 ## Pendiente
 - Historial de informes en Firestore (ya está la infraestructura, falta extenderla más allá del contador)
 - Probar en terreno y fusionar (o no) la rama `test-pdf` — ver sección "🧪 En pruebas" arriba. Requiere confirmación explícita de Isaac antes de fusionar a `main`.
-- Rediseño visual (íconos de línea, botones/tarjetas con más sombra, pantalla de Bienvenida, modo oscuro con toggle): esto va un paso *antes* incluso de `test-pdf` — solo existe como mockup aprobado (Artifact fuera del repo), todavía no se aplicó a ningún código. Ver "Lenguaje visual / diseño" arriba para el objetivo.
+- Probar en terreno y fusionar (o no) la rama `diseno-visual` — ver sección "🎨 En pruebas" arriba. Ya implementado en código, requiere confirmación explícita de Isaac antes de fusionar a `main`. Si se fusiona antes que `test-pdf`, esa rama va a necesitar traer el rediseño (sigue basada en el diseño original).
 - Logo real de Brimahd: en esa misma discusión de diseño se decidió sacar el ícono dibujado a mano de la app hasta tener el definitivo — también pendiente de aplicar al código (por ahora la marca seguiría siendo solo texto)
 - Mejora de redacción con IA (requiere backend, evaluar Firebase Functions ya que Firebase ya está en el proyecto)
