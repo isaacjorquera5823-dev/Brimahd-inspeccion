@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, runTransaction } from "firebase/firestore";
-import { ACCENT, ACCENT_TEXT, FONT, CRITICIDAD, getTheme } from "./theme";
+import { ACCENT, ACCENT_TEXT, FONT, FONT_MONO, CRITICIDAD, getTheme } from "./theme";
 import {
-  Settings, Plus, ArrowLeft, Check, X, Camera, AlertTriangle, Lightbulb,
+  Settings, Plus, ArrowLeft, Check, X, Camera, AlertTriangle,
   Mail, MessageCircle, Lock, ChevronRight, Download, Send, Sun, Moon, Trash2,
 } from "lucide-react";
 
@@ -108,7 +108,7 @@ function fechaLocalHoy() {
 
 const defaultInforme = {
   cliente: "", contacto: "", direccion: "", fecha: fechaLocalHoy(),
-  personal: [""],
+  personal: [],
   cartaGantt: "", tableros: [],
 };
 
@@ -315,9 +315,10 @@ function Logo({ size = 36, withText = true }) {
 // (después del primer pintado) y mientras tanto se muestra un indicador de
 // carga, con los botones de navegación (← Editar) ya visibles desde el
 // principio.
-function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, finalizarInforme, generarHTMLInforme, descargarHTML, s, t }) {
+function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, generarHTMLInforme, descargarHTML, compartirWhatsApp, enviarEmail, s, t }) {
   const [htmlInforme, setHtmlInforme] = useState(null);
   const [error, setError] = useState(false);
+  const [enviarOpen, setEnviarOpen] = useState(false);
 
   // Al entrar a esta pantalla, deja el scroll del navegador arriba del todo.
   // Si se venía de la lista de tableros (que puede ser muy larga con 40+
@@ -343,15 +344,28 @@ function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, final
   }, [informe, config]);
 
   const listo = !!htmlInforme;
+  const totalRegistros = informe.tableros.reduce((s2, tb) => s2 + (tb.registros?.length || 0), 0);
+  const totalCriticas = informe.tableros.reduce((s2, tb) => s2 + (tb.registros || []).reduce((s3, r) => s3 + r.observaciones.filter(o => o.criticidad === "Crítica").length, 0), 0);
+  const fechaFmt = new Date(informe.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
     <div style={{ fontFamily: FONT, fontSize: 14, background: t.bg, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <div style={{ background: t.header, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", position: "sticky", top: 0, zIndex: 20 }}>
+      <div style={{ background: t.header, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 20 }}>
         <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "7px 12px" }} onClick={() => setScreen("informe")}><ArrowLeft size={15} /> Editar</button>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button disabled={!listo} style={{ ...s.btn, ...s.btnAccent, fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => descargarHTML(informe, config)}><Download size={15} /> Descargar informe</button>
-          <button disabled={!listo} style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "8px 14px", opacity: listo ? 1 : 0.5 }} onClick={() => setEnviarScreen(true)}><Send size={15} /> Enviar</button>
-          <button style={{ ...s.btn, background: t.exito.solid, color: "#ffffff", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}><Check size={15} /> Finalizar</button>
+        <span style={{ fontSize: 12, fontWeight: 700, color: t.headerText, fontFamily: FONT_MONO }}>{informe.numero}</span>
+      </div>
+      <div style={{ display: "flex", gap: 8, padding: "10px 16px 0" }}>
+        <div style={{ flex: 1, background: t.surfaceAlt, borderRadius: 10, padding: "8px 6px", textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: t.text }}>{informe.tableros.length}</div>
+          <div style={{ fontSize: 8, fontWeight: 700, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px" }}>Tableros</div>
+        </div>
+        <div style={{ flex: 1, background: t.surfaceAlt, borderRadius: 10, padding: "8px 6px", textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: t.peligro.text }}>{totalCriticas}</div>
+          <div style={{ fontSize: 8, fontWeight: 700, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px" }}>Críticas</div>
+        </div>
+        <div style={{ flex: 1, background: t.surfaceAlt, borderRadius: 10, padding: "8px 6px", textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: t.text }}>{totalRegistros}</div>
+          <div style={{ fontSize: 8, fontWeight: 700, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px" }}>Registros</div>
         </div>
       </div>
       {error ? (
@@ -363,7 +377,36 @@ function VistaPreviaInforme({ informe, config, setScreen, setEnviarScreen, final
           <div style={{ fontSize: 13, color: t.textDim }}>Generando vista previa…</div>
         </div>
       ) : (
-        <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white" }} />
+        <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white", margin: "10px 0 0" }} />
+      )}
+      <div style={{ position: "sticky", bottom: 0, background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 }}>
+        <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, flex: 1 }} onClick={finalizarInforme}>Finalizar</button>
+        <button disabled={!listo} style={{ ...s.btn, ...s.btnAccent, flex: 1.4, opacity: listo ? 1 : 0.5 }} onClick={() => setEnviarOpen(true)}><Send size={15} /> Enviar informe</button>
+      </div>
+
+      {enviarOpen && (
+        <>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 30 }} onClick={() => setEnviarOpen(false)} />
+          <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", background: t.header, borderRadius: "18px 18px 0 0", padding: "10px 16px 16px", zIndex: 31 }}>
+            <div style={{ width: 36, height: 4, background: t.border, borderRadius: 3, margin: "0 auto 12px" }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.headerText, marginBottom: 10 }}>Enviar informe {informe.numero}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, background: t.surface, borderRadius: 12, padding: "12px 14px", marginBottom: 8, cursor: "pointer" }}
+              onClick={() => { setEnviarOpen(false); compartirWhatsApp(informe, config, fechaFmt); }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(37,211,102,.16)", color: t.whatsapp, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MessageCircle size={17} /></div>
+              <div><div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>WhatsApp</div><div style={{ fontSize: 11, color: t.textDim }}>Abre un mensaje prearmado</div></div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, background: t.surface, borderRadius: 12, padding: "12px 14px", marginBottom: 8, cursor: "pointer" }}
+              onClick={() => { setEnviarOpen(false); enviarEmail(informe, config, fechaFmt); }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: t.headerBtnBg, color: t.text, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Mail size={17} /></div>
+              <div><div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>Email</div><div style={{ fontSize: 11, color: t.textDim }}>Asunto y cuerpo prearmados</div></div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, background: t.surface, borderRadius: 12, padding: "12px 14px", cursor: listo ? "pointer" : "default", opacity: listo ? 1 : 0.5 }}
+              onClick={() => { if (!listo) return; setEnviarOpen(false); descargarHTML(informe, config); }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(227,180,25,.14)", color: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Download size={17} /></div>
+              <div><div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>Descargar HTML</div><div style={{ fontSize: 11, color: t.textDim }}>Para adjuntar manualmente</div></div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -379,14 +422,17 @@ export default function App() {
   const [informe, setInforme] = useState(null);
   const [editIdx, setEditIdx] = useState(null);
   const [tableroEdit, setTableroEdit] = useState(null);
-  const [enviarScreen, setEnviarScreen] = useState(false);
   const [sedeSearch, setSedeSearch] = useState("");
-  const [sedeFocused, setSedeFocused] = useState(false);
   const [obsSearch, setObsSearch] = useState([]);
   const [obsLibreTexto, setObsLibreTexto] = useState([]);
   const [obsLibreCrit, setObsLibreCrit] = useState([]);
-  const [obsFocused, setObsFocused] = useState([]);
   const [obsPicker, setObsPicker] = useState(null); // { regIdx } when picker is open
+  const [informeStep, setInformeStep] = useState(0); // 0 = Datos generales, 1 = Tableros
+  const [sedeSheetOpen, setSedeSheetOpen] = useState(false);
+  const [tecSheetOpen, setTecSheetOpen] = useState(false);
+  const [enviarSheetOpen, setEnviarSheetOpen] = useState(false);
+  const [swipedTablero, setSwipedTablero] = useState(null);
+  const swipeRef = useRef({});
   const fileRef = useRef({});
 
   const [proximoNumero, setProximoNumero] = useState("Cargando...");
@@ -475,6 +521,7 @@ export default function App() {
       setEditIdx(draftDisponible.editIdx ?? null);
       setScreen("tablero");
     } else {
+      setInformeStep((draftDisponible.informe.tableros || []).length > 0 ? 1 : 0);
       setScreen("informe");
     }
     setDraftDisponible(null);
@@ -490,7 +537,6 @@ export default function App() {
     if (!confirm("¿Ya descargaste o enviaste este informe? Se borrará el borrador guardado en este celular.")) return;
     borrarBorrador();
     setInforme(null);
-    setEnviarScreen(false);
     setScreen("inicio");
   }
 
@@ -498,13 +544,18 @@ export default function App() {
     setDraftDisponible(null);
     setInforme({ ...defaultInforme, numero: proximoNumero, fecha: fechaLocalHoy(), tableros: [] });
     setSedeSearch("");
+    setInformeStep(0);
     setScreen("informe");
   }
 
   function updateInforme(k, v) { setInforme(p => ({ ...p, [k]: v })); }
-  function addPersonal() { updateInforme("personal", [...informe.personal, ""]); }
-  function updatePersonal(i, v) { const p = [...informe.personal]; p[i] = v; updateInforme("personal", p); }
-  function removePersonal(i) { updateInforme("personal", informe.personal.filter((_,j) => j !== i)); }
+  function toggleTecnico(nombre) {
+    setInforme(p => {
+      const yaEsta = p.personal.includes(nombre);
+      const personal = yaEsta ? p.personal.filter(x => x !== nombre) : [...p.personal, nombre];
+      return { ...p, personal };
+    });
+  }
 
   function selectSede(sede) {
     updateInforme("cliente", sede.nombre);
@@ -931,7 +982,7 @@ ${criticasRows.length > 0 ? `
     textarea: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 6, minHeight: 80, resize: "vertical", fontFamily: FONT, color: t.text, background: t.inputBg },
     btn: { padding: "10px 18px", borderRadius: 14, border: "none", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: FONT, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 },
     btnPrimary: { background: t.modo === "light" ? "#2c2c2c" : "#333333", color: "#ffffff" },
-    btnAccent: { background: ACCENT, color: ACCENT_TEXT, boxShadow: "0 4px 14px rgba(232,185,35,0.35)" },
+    btnAccent: { background: ACCENT, color: ACCENT_TEXT, boxShadow: "0 4px 14px rgba(227,180,25,0.35)", borderRadius: 999 },
     btnDanger: { background: t.peligro.bg, color: t.peligro.text, fontSize: 12, padding: "6px 12px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
     btnGhost: { background: "transparent", color: t.text, border: `1px solid ${t.border}`, fontSize: 13, padding: "7px 14px", borderRadius: 12, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
     row: { display: "flex", gap: 8, alignItems: "center" },
@@ -979,38 +1030,52 @@ ${criticasRows.length > 0 ? `
 
   if (screen === "inicio") return (
     <div style={s.app}>
+      <style>{`
+        @keyframes brimahdAvisoPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .72; transform: scale(1.18); } }
+        .brimahd-aviso-pulse { animation: brimahdAvisoPulse 1.6s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .brimahd-aviso-pulse { animation: none !important; } }
+        details.brimahd-aviso summary { list-style: none; cursor: pointer; }
+        details.brimahd-aviso summary::-webkit-details-marker { display: none; }
+      `}</style>
       <div style={s.header}>
         <span style={{ fontSize: 15, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda. <span style={{ fontSize: 10, color: ACCENT, display: "block", letterSpacing: "0.3px" }}>Servicios Eléctricos</span></span>
         <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("config")}><Settings size={15} /> Config</button>
       </div>
-      <div style={s.body}>
+      <div style={{ ...s.body, display: "flex", flexDirection: "column", minHeight: "calc(100vh - 53px)", boxSizing: "border-box" }}>
         {draftDisponible && (
-          <div style={{ ...s.card, background: t.aviso.bg, border: `1px solid ${t.aviso.border}`, marginBottom: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: t.aviso.text, marginBottom: 4 }}><AlertTriangle size={15} /> Informe sin terminar encontrado</div>
-            <div style={{ fontSize: 12, color: t.aviso.text, marginBottom: 12, lineHeight: 1.5 }}>
-              {draftDisponible.informe.numero || "Sin número"} · {draftDisponible.informe.cliente || "Sin sede"} · {(draftDisponible.informe.tableros || []).length} tablero{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"} guardado{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"}
-              {draftDisponible.tableroEdit && draftDisponible.tableroEdit.registros && draftDisponible.tableroEdit.registros.length > 0
-                ? ` + 1 tablero en edición (${draftDisponible.tableroEdit.registros.length} registro${draftDisponible.tableroEdit.registros.length === 1 ? "" : "s"})`
-                : ""}
+          <details className="brimahd-aviso" style={{ background: t.aviso.bg, border: `1px solid ${t.aviso.border}`, borderRadius: 12, flexShrink: 0 }}>
+            <summary style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", fontSize: 12, fontWeight: 700, color: t.aviso.text }}>
+              <span className="brimahd-aviso-pulse" style={{ width: 16, height: 16, borderRadius: "50%", background: t.aviso.text, color: t.aviso.bg, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>!</span>
+              Informe sin terminar
+            </summary>
+            <div style={{ padding: "0 12px 12px" }}>
+              <div style={{ fontSize: 12, color: t.aviso.text, marginBottom: 12, lineHeight: 1.5 }}>
+                {draftDisponible.informe.numero || "Sin número"} · {draftDisponible.informe.cliente || "Sin sede"} · {(draftDisponible.informe.tableros || []).length} tablero{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"} guardado{(draftDisponible.informe.tableros || []).length === 1 ? "" : "s"}
+                {draftDisponible.tableroEdit && draftDisponible.tableroEdit.registros && draftDisponible.tableroEdit.registros.length > 0
+                  ? ` + 1 tablero en edición (${draftDisponible.tableroEdit.registros.length} registro${draftDisponible.tableroEdit.registros.length === 1 ? "" : "s"})`
+                  : ""}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={{ ...s.btn, ...s.btnPrimary, flex: 1 }} onClick={continuarBorrador}>Continuar informe</button>
+                <button style={{ ...s.btn, ...s.btnGhost, flex: 1 }} onClick={descartarBorrador}>Descartar</button>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button style={{ ...s.btn, ...s.btnPrimary, flex: 1 }} onClick={continuarBorrador}>Continuar informe</button>
-              <button style={{ ...s.btn, ...s.btnGhost, flex: 1 }} onClick={descartarBorrador}>Descartar</button>
-            </div>
-          </div>
+          </details>
         )}
-        <div style={{ ...s.card, textAlign: "center", padding: "32px 16px" }}>
-
-          <div style={{ fontSize: 18, fontWeight: 700, color: t.text, marginBottom: 6 }}>App de Inspección</div>
-          <div style={{ fontSize: 13, color: t.textDim, marginBottom: 6 }}>Próximo número:</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: ACCENT, marginBottom: 20 }}>{proximoNumero}</div>
-          <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: "13px" }} onClick={iniciarInforme}><Plus size={17} /> Crear nuevo informe</button>
-        </div>
-        <div style={{ ...s.card, background: t.surfaceAlt, border: "none" }}>
-          <div style={{ fontSize: 12, color: t.textDim, textAlign: "center" }}>
-            <strong style={{ color: t.text }}>{config.empresa}</strong> · {config.rut}<br />
-            <span style={{ color: ACCENT }}>{config.email}</span>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <button
+            onClick={iniciarInforme}
+            style={{ width: 88, height: 88, borderRadius: "50%", background: ACCENT, color: ACCENT_TEXT, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 38, fontWeight: 800, fontFamily: FONT, boxShadow: "0 10px 24px -8px rgba(0,0,0,.4)" }}
+            aria-label="Nuevo informe"
+          >+</button>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: t.text, marginTop: 2 }}>Nuevo informe</div>
+          <div style={{ marginTop: 14, fontSize: 11.5, fontWeight: 600, color: t.textDim, background: t.surfaceAlt, border: `1px solid ${t.border}`, borderRadius: 20, padding: "7px 13px" }}>
+            Próximo informe · <b style={{ color: t.text, fontFamily: FONT_MONO, fontWeight: 700 }}>{proximoNumero}</b>
           </div>
+        </div>
+        <div style={{ textAlign: "center", fontSize: 11, color: t.textDim, lineHeight: 1.6, padding: "8px 0 4px", flexShrink: 0 }}>
+          <strong style={{ color: t.text }}>{config.empresa}</strong> · {config.rut}<br />
+          <span style={{ color: ACCENT }}>{config.email}</span>
         </div>
       </div>
     </div>
@@ -1052,116 +1117,205 @@ ${criticasRows.length > 0 ? `
     </div>
   );
 
-  if (screen === "informe" && informe) return (
+  if (screen === "informe" && informe) {
+
+    const fieldRow = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: 10 };
+    const fieldRowLabel = { fontSize: 10, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px", fontFamily: FONT, marginBottom: 3, display: "block" };
+    const fieldRowValue = { fontSize: 13, fontWeight: 600, color: t.text, fontFamily: FONT };
+    const fieldRowPlaceholder = { ...fieldRowValue, fontWeight: 500, color: t.textFaint };
+    const stickyBar = { position: "sticky", bottom: 0, background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 };
+    const personalTexto = informe.personal.filter(Boolean).join(", ");
+
+    return (
     <div style={s.app}>
       <div style={s.header}>
         <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
-        <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("inicio")}><ArrowLeft size={15} /> Salir</button>
+        <button
+          style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }}
+          onClick={() => informeStep === 0 ? setScreen("inicio") : setInformeStep(0)}
+        ><ArrowLeft size={15} /> {informeStep === 0 ? "Salir" : "Atrás"}</button>
       </div>
       <div style={{ background: ACCENT, padding: "10px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT_TEXT }}>Informe {informe.numero}</span>
-        <span style={{ fontSize: 11, color: ACCENT_TEXT, opacity: 0.7 }}>Datos generales</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT_TEXT, fontFamily: FONT_MONO }}>Informe {informe.numero}</span>
+        <span style={{ fontSize: 11, color: ACCENT_TEXT, opacity: 0.7 }}>{informeStep === 0 ? "Datos generales" : `Tableros (${informe.tableros.length})`}</span>
       </div>
       {autoguardadoError && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: t.peligro.solid, color: "#ffffff", padding: "8px 18px", fontSize: 12, lineHeight: 1.4 }}>
           <AlertTriangle size={16} style={{ flexShrink: 0 }} /> No se pudo guardar el progreso automáticamente en este celular. Si la app se cierra, podrías perder lo hecho desde ahora. Genera y descarga el informe pronto para no perder trabajo.
         </div>
       )}
-      <div style={s.body}>
-        <div style={s.card}>
-          <div style={s.sectionTitle}>Cliente</div>
-          <label style={s.label}>Sede</label>
-          <select
-            style={s.select}
-            value={informe.cliente}
-            onChange={e => {
-              const sede = SEDES.find(s => s.nombre === e.target.value);
-              if (sede) selectSede(sede);
-              else updateInforme("cliente", "");
-            }}
-          >
-            <option value="">— Seleccionar sede —</option>
-            {SEDES.map(sede => (
-              <option key={sede.nombre} value={sede.nombre}>{sede.nombre}</option>
-            ))}
-          </select>
+      <div style={{ padding: "10px 16px 4px" }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          <span style={{ height: 4, flex: 1, borderRadius: 3, background: ACCENT }} />
+          <span style={{ height: 4, flex: 1, borderRadius: 3, background: informeStep === 1 ? ACCENT : t.border }} />
+        </div>
+      </div>
+
+      {informeStep === 0 && (
+        <div style={s.body}>
+          <div style={fieldRow} onClick={() => { setSedeSearch(""); setSedeSheetOpen(true); }}>
+            <div>
+              <span style={fieldRowLabel}>Sede</span>
+              <span style={informe.cliente ? fieldRowValue : fieldRowPlaceholder}>{informe.cliente || "— Seleccionar sede —"}</span>
+            </div>
+            <ChevronRight size={16} style={{ color: t.textFaint }} />
+          </div>
           <label style={s.label}>Contacto</label>
           <input style={s.input} value={informe.contacto} onChange={e => updateInforme("contacto", e.target.value)} placeholder="Nombre del contacto" />
           <label style={s.label}>Dirección</label>
           <input style={s.input} value={informe.direccion} onChange={e => updateInforme("direccion", e.target.value)} placeholder="Dirección de la sede" />
-          <label style={s.label}>Fecha</label>
+          <label style={s.label}>Fecha de servicio</label>
           <input style={s.input} type="date" value={informe.fecha} onChange={e => updateInforme("fecha", e.target.value)} />
-        </div>
-        <div style={s.card}>
-          <div style={s.sectionTitle}>Personal en terreno</div>
-          {informe.personal.map((p, i) => (
-            <div key={i} style={{ ...s.row, marginBottom: 8 }}>
-              <select style={{ ...s.select, marginBottom: 0, flex: 1 }} value={p} onChange={e => updatePersonal(i, e.target.value)}>
-                <option value="">— Seleccionar técnico —</option>
-                {TECNICOS.map(tec => <option key={tec} value={tec}>{tec}</option>)}
-              </select>
-              {informe.personal.length > 1 && <button style={s.btnDanger} onClick={() => removePersonal(i)}><X size={13} /></button>}
-            </div>
-          ))}
-          <button style={{ ...s.btnGhost, width: "100%", marginTop: 4 }} onClick={addPersonal}><Plus size={14} /> Agregar técnico</button>
-        </div>
-        <div style={s.card}>
-          <div style={s.sectionTitle}>Próxima mantención</div>
-          <label style={s.label}>Fecha próxima visita</label>
-          <div style={s.row}>
-            <select
-              style={{ ...s.select, flex: 1, marginBottom: 0 }}
-              value={informe.cartaGantt.split(" ")[0] || ""}
-              onChange={e => {
-                const anio = informe.cartaGantt.split(" ")[1] || String(ANIO_ACTUAL);
-                updateInforme("cartaGantt", e.target.value ? `${e.target.value} ${anio}` : "");
-              }}
-            >
-              <option value="">Mes</option>
-              {MESES.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <select
-              style={{ ...s.select, flex: 1, marginBottom: 0 }}
-              value={informe.cartaGantt.split(" ")[1] || ""}
-              onChange={e => {
-                const mes = informe.cartaGantt.split(" ")[0] || "";
-                updateInforme("cartaGantt", mes ? `${mes} ${e.target.value}` : (e.target.value ? ` ${e.target.value}` : ""));
-              }}
-            >
-              <option value="">Año</option>
-              {ANIOS.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={s.card}>
-          <div style={{ ...s.row, justifyContent: "space-between", marginBottom: 12 }}>
-            <div style={s.sectionTitle}>Tableros ({informe.tableros.length})</div>
-          </div>
-          {informe.tableros.map((tab, i) => (
-            <div key={tab.id} style={{ border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
-              <div style={{ background: t.header, color: t.headerText, padding: "9px 13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{(tab.zona === "Otro" ? tab.zonaOtro : tab.zona) || tab.ubicacion}</span>
-                <span style={{ fontSize: 11, background: t.headerBtnBg, padding: "2px 8px", borderRadius: 10 }}>{tab.piso} · {tab.ubicacion}{tab.numeroSala ? ` ${tab.numeroSala}` : ""}</span>
-              </div>
-              <div style={{ padding: "10px 13px", background: t.surface }}>
-                <span style={s.badge(tab.criticidad)}>{tab.criticidad}</span>
-                {tab.garantia && <span style={{ marginLeft: 6, fontSize: 11, background: t.garantia.bg, color: t.garantia.text, padding: "3px 8px", borderRadius: 10, fontWeight: 700 }}>En garantía</span>}
-                <div style={{ fontSize: 12, color: t.textDim, marginTop: 8, lineHeight: 1.5 }}>{tab.registros?.length > 0 ? `${tab.registros.length} registro${tab.registros.length > 1 ? "s" : ""}` : "Sin registros"}</div>
 
-                <div style={{ ...s.row, marginTop: 10, justifyContent: "flex-end" }}>
-                  <button style={s.btnDanger} onClick={() => deleteTablero(i)}><Trash2 size={13} /> Eliminar</button>
-                  <button style={{ ...s.btnGhost, fontSize: 12, padding: "6px 14px" }} onClick={() => openTablero(i)}>Editar</button>
+          <div style={{ ...fieldRow, marginTop: 2 }} onClick={() => setTecSheetOpen(true)}>
+            <div>
+              <span style={fieldRowLabel}>Personal en terreno</span>
+              <span style={personalTexto ? fieldRowValue : fieldRowPlaceholder}>{personalTexto || "— Seleccionar técnicos —"}</span>
+            </div>
+            <ChevronRight size={16} style={{ color: t.textFaint }} />
+          </div>
+
+          <div style={s.card}>
+            <div style={s.sectionTitle}>Próxima mantención</div>
+            <label style={s.label}>Fecha próxima visita</label>
+            <div style={s.row}>
+              <select
+                style={{ ...s.select, flex: 1, marginBottom: 0 }}
+                value={informe.cartaGantt.split(" ")[0] || ""}
+                onChange={e => {
+                  const anio = informe.cartaGantt.split(" ")[1] || String(ANIO_ACTUAL);
+                  updateInforme("cartaGantt", e.target.value ? `${e.target.value} ${anio}` : "");
+                }}
+              >
+                <option value="">Mes</option>
+                {MESES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <select
+                style={{ ...s.select, flex: 1, marginBottom: 0 }}
+                value={informe.cartaGantt.split(" ")[1] || ""}
+                onChange={e => {
+                  const mes = informe.cartaGantt.split(" ")[0] || "";
+                  updateInforme("cartaGantt", mes ? `${mes} ${e.target.value}` : (e.target.value ? ` ${e.target.value}` : ""));
+                }}
+              >
+                <option value="">Año</option>
+                {ANIOS.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ height: 8 }} />
+        </div>
+      )}
+
+      {informeStep === 1 && (
+        <div style={{ ...s.body, position: "relative" }}>
+          {informe.tableros.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 16px", color: t.textFaint, fontSize: 13 }}>
+              Todavía no agregas ningún tablero.<br />Usa el botón "+" para agregar el primero.
+            </div>
+          )}
+          {informe.tableros.map((tab, i) => {
+            const abierto = swipedTablero === i;
+            return (
+              <div key={tab.id} style={{ position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
+                <div
+                  style={{ position: "absolute", inset: 0, background: t.peligro.solid, display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 16px", cursor: "pointer" }}
+                  onClick={() => { deleteTablero(i); setSwipedTablero(null); }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#fff", fontSize: 12, fontWeight: 700 }}><Trash2 size={14} /> Eliminar</span>
+                </div>
+                <div
+                  style={{ position: "relative", border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden", background: t.bg, transform: abierto ? "translateX(-84px)" : "translateX(0)", transition: "transform .2s ease" }}
+                  onTouchStart={e => { swipeRef.current[i] = { startX: e.touches[0].clientX }; }}
+                  onTouchMove={e => { const st = swipeRef.current[i]; if (st) st.dx = e.touches[0].clientX - st.startX; }}
+                  onTouchEnd={() => {
+                    const st = swipeRef.current[i];
+                    if (st && st.dx < -40) setSwipedTablero(i);
+                    else if (!st || st.dx > -10) { if (abierto) setSwipedTablero(null); }
+                    swipeRef.current[i] = null;
+                  }}
+                  onClick={() => { if (abierto) setSwipedTablero(null); else openTablero(i); }}
+                >
+                  <div style={{ background: t.header, color: t.headerText, padding: "9px 13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{(tab.zona === "Otro" ? tab.zonaOtro : tab.zona) || tab.ubicacion}</span>
+                    <span style={{ fontSize: 11, background: t.headerBtnBg, padding: "2px 8px", borderRadius: 10 }}>{tab.piso} · {tab.ubicacion}{tab.numeroSala ? ` ${tab.numeroSala}` : ""}</span>
+                  </div>
+                  <div style={{ padding: "10px 13px", background: t.surface }}>
+                    <span style={s.badge(tab.criticidad)}>{tab.criticidad}</span>
+                    {tab.garantia && <span style={{ marginLeft: 6, fontSize: 11, background: t.garantia.bg, color: t.garantia.text, padding: "3px 8px", borderRadius: 10, fontWeight: 700 }}>En garantía</span>}
+                    <div style={{ fontSize: 12, color: t.textDim, marginTop: 8, lineHeight: 1.5 }}>{tab.registros?.length > 0 ? `${tab.registros.length} registro${tab.registros.length > 1 ? "s" : ""}` : "Sin registros"}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          <button style={{ ...s.btn, ...s.btnGhost, width: "100%", marginTop: 4 }} onClick={() => openTablero(null)}><Plus size={15} /> Agregar tablero</button>
+            );
+          })}
+          <div style={{ height: 76 }} />
+          <button
+            onClick={() => openTablero(null)}
+            aria-label="Agregar tablero"
+            style={{ position: "fixed", right: 16, bottom: 84, width: 50, height: 50, borderRadius: "50%", background: ACCENT, color: ACCENT_TEXT, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 20px -6px rgba(0,0,0,.55)", zIndex: 15 }}
+          ><Plus size={24} /></button>
         </div>
-        <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: 14, fontSize: 15, opacity: generando ? 0.6 : 1 }} onClick={generarInforme} disabled={generando}>{generando ? "Generando…" : "Generar informe →"}</button>
-        <div style={{ height: 20 }} />
+      )}
+
+      <div style={stickyBar}>
+        {informeStep === 0 ? (
+          <button style={{ ...s.btn, ...s.btnAccent, width: "100%" }} onClick={() => setInformeStep(1)}>Siguiente →</button>
+        ) : (
+          <button style={{ ...s.btn, ...s.btnAccent, width: "100%", opacity: generando ? 0.6 : 1 }} onClick={generarInforme} disabled={generando}>{generando ? "Generando…" : "Generar informe →"}</button>
+        )}
       </div>
+
+      {sedeSheetOpen && (
+        <>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 30 }} onClick={() => setSedeSheetOpen(false)} />
+          <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", background: t.header, borderRadius: "18px 18px 0 0", padding: "10px 16px 16px", zIndex: 31, maxHeight: "78%", display: "flex", flexDirection: "column" }}>
+            <div style={{ width: 36, height: 4, background: t.border, borderRadius: 3, margin: "0 auto 12px" }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.headerText, marginBottom: 10 }}>Seleccionar sede</div>
+            <input
+              style={{ ...s.input, marginBottom: 10, background: t.surface }}
+              value={sedeSearch}
+              onChange={e => setSedeSearch(e.target.value)}
+              placeholder="Buscar sede…"
+              autoFocus
+            />
+            <div style={{ overflowY: "auto" }}>
+              {sedesFiltradas.length === 0 && <div style={{ padding: 16, textAlign: "center", color: t.textFaint, fontSize: 13 }}>Sin resultados</div>}
+              {sedesFiltradas.map(sede => (
+                <div
+                  key={sede.nombre}
+                  onClick={() => { selectSede(sede); setSedeSheetOpen(false); }}
+                  style={{ padding: "11px 12px", borderRadius: 10, marginBottom: 6, fontSize: 13, fontWeight: sede.nombre === informe.cliente ? 700 : 500, background: sede.nombre === informe.cliente ? "rgba(227,180,25,.14)" : t.surface, color: sede.nombre === informe.cliente ? ACCENT : t.text, cursor: "pointer" }}
+                >{sede.nombre}</div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {tecSheetOpen && (
+        <>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 30 }} onClick={() => setTecSheetOpen(false)} />
+          <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", background: t.header, borderRadius: "18px 18px 0 0", padding: "10px 16px 16px", zIndex: 31 }}>
+            <div style={{ width: 36, height: 4, background: t.border, borderRadius: 3, margin: "0 auto 12px" }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.headerText, marginBottom: 10 }}>Personal en terreno <span style={{ color: t.headerTextDim, fontWeight: 500 }}>· elige uno o más</span></div>
+            {TECNICOS.map(tec => {
+              const sel = informe.personal.includes(tec);
+              return (
+                <div
+                  key={tec}
+                  onClick={() => toggleTecnico(tec)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 12px", borderRadius: 10, marginBottom: 6, fontSize: 13, fontWeight: sel ? 700 : 500, background: sel ? "rgba(227,180,25,.14)" : t.surface, color: sel ? ACCENT : t.text, cursor: "pointer" }}
+                >{tec}{sel && <Check size={15} />}</div>
+              );
+            })}
+            <button style={{ ...s.btn, ...s.btnAccent, width: "100%", marginTop: 10 }} onClick={() => setTecSheetOpen(false)}>Listo</button>
+          </div>
+        </>
+      )}
     </div>
-  );
+    );
+  }
 
   if (screen === "tablero" && tableroEdit) {
 
@@ -1173,6 +1327,18 @@ ${criticasRows.length > 0 ? `
       o.texto.toLowerCase().includes(regSearch.toLowerCase())
     );
     const reg = tableroEdit.registros[regIdx];
+
+    function toggleObsChip(obs) {
+      const idx = reg.observaciones.findIndex(o => o.texto === obs.texto);
+      if (idx >= 0) removeObsFromRegistro(regIdx, idx);
+      else addObsToRegistro(regIdx, obs);
+    }
+
+    const gruposPorCriticidad = CRITICIDAD.map(crit => ({
+      crit,
+      items: regFiltered.filter(o => o.criticidad === crit),
+    })).filter(g => g.items.length > 0);
+
     return (
       <div style={s.app}>
         <div style={s.header}>
@@ -1190,71 +1356,82 @@ ${criticasRows.length > 0 ? `
             onChange={e => setObsSearch(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
             placeholder="Buscar observación…"
           />
-          <div style={{ background: t.surface, borderRadius: 14, border: `1px solid ${t.border}`, overflow: "hidden", marginBottom: 12 }}>
-            {regFiltered.length === 0 && (
-              <div style={{ padding: "16px", textAlign: "center", color: t.textFaint, fontSize: 13 }}>Sin resultados</div>
-            )}
-            {regFiltered.map((obs, i) => {
-              const already = reg.observaciones.some(o => o.texto === obs.texto);
-              return (
-                <div key={i}
-                  onClick={() => { if (!already) addObsToRegistro(regIdx, obs); }}
-                  style={{ padding: "12px 14px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: already ? t.surfaceAlt : t.surface, opacity: already ? 0.6 : 1, cursor: already ? "default" : "pointer" }}>
-                  <span style={{ flex: 1, fontSize: 13, color: t.text, lineHeight: 1.4 }}>{obs.texto}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10, background: t.criticidad[obs.criticidad].bg, color: t.criticidad[obs.criticidad].text, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center" }}>
-                    {already ? <Check size={11} /> : obs.criticidad}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <div style={s.card}>
-            <div style={s.sectionTitle}>¿No está en la lista? Agrégala manualmente</div>
-            <label style={s.label}>Observación</label>
-            <input
-              style={s.input}
-              value={obsLibreTexto[regIdx] || ""}
-              onChange={e => setObsLibreTexto(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
-              placeholder="Escribe la observación"
-            />
-            <label style={s.label}>Criticidad</label>
-            <select
-              style={s.select}
-              value={obsLibreCrit[regIdx] || "Media"}
-              onChange={e => setObsLibreCrit(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}>
-              {CRITICIDAD.map(c => <option key={c}>{c}</option>)}
-            </select>
-            <button
-              style={{ ...s.btn, ...s.btnGhost, width: "100%", padding: 12, marginTop: 10 }}
-              onClick={() => {
-                const texto = (obsLibreTexto[regIdx] || "").trim();
-                if (!texto) return;
-                addObsToRegistro(regIdx, { texto, criticidad: obsLibreCrit[regIdx] || "Media", libre: true });
-                setObsLibreTexto(p => { const a = [...p]; a[regIdx] = ""; return a; });
-              }}>
-              <Plus size={15} /> Agregar observación
-            </button>
-          </div>
-          {reg.observaciones.length > 0 && (
-            <div style={s.card}>
-              <div style={s.sectionTitle}>Seleccionadas ({reg.observaciones.length})</div>
-              {reg.observaciones.map((obs, oi) => (
-                <div key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: t.criticidad[obs.criticidad].bg, borderRadius: 10, padding: "7px 10px", marginBottom: 5 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: t.criticidad[obs.criticidad].text, minWidth: 18, paddingTop: 1, opacity: 0.7 }}>{oi + 1}.</span>
-                  <span style={{ flex: 1, fontSize: 12, color: t.criticidad[obs.criticidad].text, lineHeight: 1.4, fontWeight: 500 }}>{obs.texto}</span>
-                  <button onClick={() => removeObsFromRegistro(regIdx, oi)} style={{ background: "none", border: "none", cursor: "pointer", color: t.criticidad[obs.criticidad].text, lineHeight: 1, padding: "0 2px", opacity: 0.7, display: "flex" }}><X size={13} /></button>
-                </div>
-              ))}
-            </div>
+          {regFiltered.length === 0 && (
+            <div style={{ padding: "16px", textAlign: "center", color: t.textFaint, fontSize: 13 }}>Sin resultados</div>
           )}
-          <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: 14 }} onClick={() => setObsPicker(null)}>
-            Confirmar observaciones
-          </button>
-          <div style={{ height: 20 }} />
+          {gruposPorCriticidad.map(({ crit, items }) => (
+            <div key={crit} style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, color: t.criticidad[crit].text, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: 8, fontFamily: FONT }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.criticidad[crit].text }} />
+                {crit}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                {items.map((obs, i) => {
+                  const sel = reg.observaciones.some(o => o.texto === obs.texto);
+                  return (
+                    <button key={i} onClick={() => toggleObsChip(obs)}
+                      style={{
+                        fontSize: 12, fontWeight: 600, padding: "8px 12px", borderRadius: 20, cursor: "pointer",
+                        border: sel ? "none" : `1px solid ${t.border}`, fontFamily: FONT,
+                        background: sel ? t.criticidad[crit].bg : "transparent",
+                        color: sel ? t.criticidad[crit].text : t.text,
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                      }}>
+                      {sel && <Check size={12} />}{obs.texto}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <details>
+            <summary style={{ listStyle: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: ACCENT, padding: "6px 2px" }}>+ Otra observación (no está en la lista)</summary>
+            <div style={{ ...s.card, marginTop: 8 }}>
+              <label style={s.label}>Observación</label>
+              <input
+                style={s.input}
+                value={obsLibreTexto[regIdx] || ""}
+                onChange={e => setObsLibreTexto(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}
+                placeholder="Escribe la observación"
+              />
+              <label style={s.label}>Criticidad</label>
+              <select
+                style={s.select}
+                value={obsLibreCrit[regIdx] || "Media"}
+                onChange={e => setObsLibreCrit(p => { const a = [...p]; a[regIdx] = e.target.value; return a; })}>
+                {CRITICIDAD.map(c => <option key={c}>{c}</option>)}
+              </select>
+              <button
+                style={{ ...s.btn, ...s.btnGhost, width: "100%", padding: 12, marginTop: 10 }}
+                onClick={() => {
+                  const texto = (obsLibreTexto[regIdx] || "").trim();
+                  if (!texto) return;
+                  addObsToRegistro(regIdx, { texto, criticidad: obsLibreCrit[regIdx] || "Media", libre: true });
+                  setObsLibreTexto(p => { const a = [...p]; a[regIdx] = ""; return a; });
+                }}>
+                <Plus size={15} /> Agregar observación
+              </button>
+            </div>
+          </details>
+          <div style={{ height: 68 }} />
+        </div>
+        <div style={{ position: "sticky", bottom: 0, background: t.header, borderTop: `1px solid ${t.border}`, padding: "10px 16px 12px", zIndex: 20 }}>
+          <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: t.headerTextDim, marginBottom: 8 }}>
+            {reg.observaciones.length} seleccionada{reg.observaciones.length === 1 ? "" : "s"}
+          </div>
+          <button style={{ ...s.btn, ...s.btnAccent, width: "100%" }} onClick={() => setObsPicker(null)}>Listo</button>
         </div>
       </div>
     );
   }
+
+  const identResumen = [
+    tableroEdit.zona === "Otro" ? tableroEdit.zonaOtro : tableroEdit.zona,
+    tableroEdit.piso,
+    tableroEdit.nombreTablero || tableroEdit.ubicacion,
+    tableroEdit.garantia ? "En garantía" : "",
+  ].filter(Boolean).join(" · ");
 
   return (
     <div style={s.app}>
@@ -1268,48 +1445,56 @@ ${criticasRows.length > 0 ? `
       <div style={s.body}>
 
         {/* ── Datos del tablero ── */}
-        <div style={s.card}>
-          <div style={s.sectionTitle}>Identificación</div>
-          <label style={s.label}>Zona</label>
-          <select style={s.select} value={tableroEdit.zona} onChange={e => setTableroEdit(p => ({ ...p, zona: e.target.value, zonaOtro: "" }))}>
-            {ZONAS.map(z => <option key={z}>{z}</option>)}
-          </select>
-          {tableroEdit.zona === "Otro" && (
-            <input style={s.input} value={tableroEdit.zonaOtro} onChange={e => setTableroEdit(p => ({ ...p, zonaOtro: e.target.value }))} placeholder="Escribe la zona" />
-          )}
-          <label style={s.label}>Piso</label>
-          <select style={s.select} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
-            {PISOS.map(p => <option key={p}>{p}</option>)}
-          </select>
-          <label style={s.label}>Ubicación</label>
-          <select style={s.select} value={tableroEdit.ubicacion} onChange={e => setTableroEdit(p => ({ ...p, ubicacion: e.target.value, numeroSala: "" }))}>
-            {UBICACIONES.map(u => <option key={u}>{u}</option>)}
-          </select>
-          {(tableroEdit.ubicacion === "Sala" || tableroEdit.ubicacion === "Laboratorio") && (
-            <>
-              <label style={s.label}>{tableroEdit.ubicacion === "Laboratorio" ? "Nombre laboratorio" : "Número de sala"}</label>
-              <input style={s.input} value={tableroEdit.numeroSala} onChange={e => setTableroEdit(p => ({ ...p, numeroSala: e.target.value }))} placeholder={tableroEdit.ubicacion === "Laboratorio" ? "Ej: Laboratorio de Redes" : "Ej: 302"} />
-            </>
-          )}
-          <label style={s.label}>Nombre de tablero</label>
-          <input style={s.input} value={tableroEdit.nombreTablero} onChange={e => setTableroEdit(p => ({ ...p, nombreTablero: e.target.value }))} placeholder="Ej: TD-1" />
-          <label style={s.label}>Protección general</label>
-          <input style={s.input} value={tableroEdit.proteccionGeneral} onChange={e => setTableroEdit(p => ({ ...p, proteccionGeneral: e.target.value }))} placeholder="Ej: 3x100A" />
-          <label style={s.label}>Marca</label>
-          <select style={s.select} value={tableroEdit.marca} onChange={e => setTableroEdit(p => ({ ...p, marca: e.target.value, marcaOtro: "" }))}>
-            {MARCAS.map(m => <option key={m}>{m}</option>)}
-          </select>
-          {tableroEdit.marca === "Otro" && (
-            <input style={s.input} value={tableroEdit.marcaOtro} onChange={e => setTableroEdit(p => ({ ...p, marcaOtro: e.target.value }))} placeholder="Escribe la marca" />
-          )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? t.garantia.bg : t.surfaceAlt, borderRadius: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? t.garantia.text : t.textDim }}>Tablero en garantía</span>
-            <button onClick={() => setTableroEdit(p => ({ ...p, garantia: !p.garantia }))}
-              style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? t.garantia.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
-              <div style={{ position: "absolute", top: 4, left: tableroEdit.garantia ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
-            </button>
+        <details open={editIdx === null} style={{ marginBottom: 14 }}>
+          <summary style={{ listStyle: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "11px 13px" }}>
+            <div>
+              <div style={{ fontSize: 10, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: 3, fontFamily: FONT }}>Identificación</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>{identResumen || "Sin completar"}</div>
+            </div>
+            <ChevronRight size={16} style={{ color: t.textFaint }} />
+          </summary>
+          <div style={{ ...s.card, marginTop: 8 }}>
+            <label style={s.label}>Zona</label>
+            <select style={s.select} value={tableroEdit.zona} onChange={e => setTableroEdit(p => ({ ...p, zona: e.target.value, zonaOtro: "" }))}>
+              {ZONAS.map(z => <option key={z}>{z}</option>)}
+            </select>
+            {tableroEdit.zona === "Otro" && (
+              <input style={s.input} value={tableroEdit.zonaOtro} onChange={e => setTableroEdit(p => ({ ...p, zonaOtro: e.target.value }))} placeholder="Escribe la zona" />
+            )}
+            <label style={s.label}>Piso</label>
+            <select style={s.select} value={tableroEdit.piso} onChange={e => setTableroEdit(p => ({ ...p, piso: e.target.value }))}>
+              {PISOS.map(p => <option key={p}>{p}</option>)}
+            </select>
+            <label style={s.label}>Ubicación</label>
+            <select style={s.select} value={tableroEdit.ubicacion} onChange={e => setTableroEdit(p => ({ ...p, ubicacion: e.target.value, numeroSala: "" }))}>
+              {UBICACIONES.map(u => <option key={u}>{u}</option>)}
+            </select>
+            {(tableroEdit.ubicacion === "Sala" || tableroEdit.ubicacion === "Laboratorio") && (
+              <>
+                <label style={s.label}>{tableroEdit.ubicacion === "Laboratorio" ? "Nombre laboratorio" : "Número de sala"}</label>
+                <input style={s.input} value={tableroEdit.numeroSala} onChange={e => setTableroEdit(p => ({ ...p, numeroSala: e.target.value }))} placeholder={tableroEdit.ubicacion === "Laboratorio" ? "Ej: Laboratorio de Redes" : "Ej: 302"} />
+              </>
+            )}
+            <label style={s.label}>Nombre de tablero</label>
+            <input style={s.input} value={tableroEdit.nombreTablero} onChange={e => setTableroEdit(p => ({ ...p, nombreTablero: e.target.value }))} placeholder="Ej: TD-1" />
+            <label style={s.label}>Protección general</label>
+            <input style={s.input} value={tableroEdit.proteccionGeneral} onChange={e => setTableroEdit(p => ({ ...p, proteccionGeneral: e.target.value }))} placeholder="Ej: 3x100A" />
+            <label style={s.label}>Marca</label>
+            <select style={s.select} value={tableroEdit.marca} onChange={e => setTableroEdit(p => ({ ...p, marca: e.target.value, marcaOtro: "" }))}>
+              {MARCAS.map(m => <option key={m}>{m}</option>)}
+            </select>
+            {tableroEdit.marca === "Otro" && (
+              <input style={s.input} value={tableroEdit.marcaOtro} onChange={e => setTableroEdit(p => ({ ...p, marcaOtro: e.target.value }))} placeholder="Escribe la marca" />
+            )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? t.garantia.bg : t.surfaceAlt, borderRadius: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? t.garantia.text : t.textDim }}>Tablero en garantía</span>
+              <button onClick={() => setTableroEdit(p => ({ ...p, garantia: !p.garantia }))}
+                style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? t.garantia.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
+                <div style={{ position: "absolute", top: 4, left: tableroEdit.garantia ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
+              </button>
+            </div>
           </div>
-        </div>
+        </details>
 
         {/* ── Registros ── */}
         <div style={s.sectionTitle}>Registros</div>
@@ -1385,56 +1570,20 @@ ${criticasRows.length > 0 ? `
             </div>
           );
         })}
-
-        <button style={{ ...s.btn, ...s.btnGhost, width: "100%", marginBottom: 12 }} onClick={addRegistro}>
-          <Plus size={15} /> Agregar registro
+        <div style={{ height: 68 }} />
+      </div>
+      <div style={{ position: "sticky", bottom: 0, background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 }}>
+        <button style={{ ...s.btn, ...s.btnGhost, flex: 1 }} onClick={addRegistro}>
+          <Plus size={15} /> Registro
         </button>
-
-        <button style={{ ...s.btn, ...s.btnAccent, width: "100%", padding: 14 }} onClick={saveTablero}>Guardar tablero</button>
-        <div style={{ height: 20 }} />
+        <button style={{ ...s.btn, ...s.btnAccent, flex: 1.4 }} onClick={saveTablero}>Guardar tablero</button>
       </div>
     </div>
   );
   }
 
-  if (screen === "preview" && enviarScreen && informe) {
-    const fechaFmt = new Date(informe.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
-    return (
-      <div style={s.app}>
-        <div style={s.header}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
-          <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setEnviarScreen(false)}><ArrowLeft size={15} /> Volver</button>
-        </div>
-        <div style={{ background: ACCENT, padding: "10px 18px" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, color: ACCENT_TEXT }}><Send size={15} /> Enviar informe {informe.numero}</span>
-        </div>
-        <div style={s.body}>
-          <div style={{ ...s.card, display: "flex", gap: 10, alignItems: "flex-start", background: t.aviso.bg, border: `1px solid ${t.aviso.border}`, marginBottom: 16 }}>
-            <Lightbulb size={17} style={{ color: t.aviso.text, flexShrink: 0, marginTop: 1 }} />
-            <div style={{ fontSize: 13, color: t.aviso.text, lineHeight: 1.6 }}>
-              Asegúrate de haber descargado el informe antes de continuar para poder adjuntarlo.
-            </div>
-          </div>
-          <div style={s.card}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 14 }}>Elige cómo enviar</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button style={{ ...s.btn, background: t.whatsapp, color: "white", width: "100%", padding: 13, fontSize: 14 }}
-                onClick={() => compartirWhatsApp(informe, config, fechaFmt)}>
-                <MessageCircle size={17} /> Enviar por WhatsApp
-              </button>
-              <button style={{ ...s.btn, ...s.btnGhost, width: "100%", padding: 13, fontSize: 14 }}
-                onClick={() => enviarEmail(informe, config, fechaFmt)}>
-                <Mail size={17} /> Enviar por Email
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (screen === "preview" && informe) {
-    return <VistaPreviaInforme informe={informe} config={config} setScreen={setScreen} setEnviarScreen={setEnviarScreen} finalizarInforme={finalizarInforme} generarHTMLInforme={generarHTMLInforme} descargarHTML={descargarHTML} s={s} t={t} />;
+    return <VistaPreviaInforme informe={informe} config={config} setScreen={setScreen} finalizarInforme={finalizarInforme} generarHTMLInforme={generarHTMLInforme} descargarHTML={descargarHTML} compartirWhatsApp={compartirWhatsApp} enviarEmail={enviarEmail} s={s} t={t} />;
   }
   return null;
 }

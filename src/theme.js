@@ -3,9 +3,10 @@
 // Los colores "semánticos" (éxito, peligro, garantía, criticidad, WhatsApp)
 // no cuentan como "acento": le dicen algo al usuario, no son decorativos.
 
-export const ACCENT = "#e8b923";
-export const ACCENT_TEXT = "#2c2200"; // texto oscuro legible sobre el dorado
-export const FONT = "'Roboto', sans-serif";
+export const ACCENT = "#e3b419";
+export const ACCENT_TEXT = "#1f1800"; // texto oscuro legible sobre el dorado
+export const FONT = "'IBM Plex Sans', sans-serif";
+export const FONT_MONO = "'IBM Plex Mono', monospace"; // números de informe y fechas
 
 export const CRITICIDAD = ["Crítica", "Media", "Leve"];
 
@@ -39,17 +40,17 @@ const PALETA_CLARA = {
 
 const PALETA_OSCURA = {
   modo: "dark",
-  bg: "#1c1c1c",
-  surface: "#242424",
-  surfaceAlt: "#202020",
-  header: "#141414",
-  headerText: "#f0f0f0",
-  headerTextDim: "rgba(240,240,240,0.55)",
+  bg: "#14171a",
+  surface: "#1b1f23",
+  surfaceAlt: "#1a1d20",
+  header: "#0f1214",
+  headerText: "#eef1f2",
+  headerTextDim: "rgba(238,241,242,0.55)",
   headerBtnBg: "rgba(255,255,255,0.08)",
-  text: "#f0f0f0",
-  textDim: "#9a9a9a",
-  textFaint: "#6f6f6f",
-  border: "#333333",
+  text: "#eef1f2",
+  textDim: "#8b939b",
+  textFaint: "#5f666c",
+  border: "#2a3035",
   cardShadow: "none",
   inputBg: "#242424",
   overlayBg: "#2c2c2c",
