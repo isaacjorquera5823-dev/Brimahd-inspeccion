@@ -55,7 +55,26 @@ Isaac es el desarrollador y dueño del código/IP. Emanuel Madrid Valenzuela (du
 - **Presentación comercial:** https://isaacjorquera5823-dev.github.io/brimahd-presentacion/
 - **Repo app:** https://github.com/isaacjorquera5823-dev/Brimahd-inspeccion
 - **Repo presentación:** https://github.com/isaacjorquera5823-dev/brimahd-presentacion
+- **QAS (pruebas):** https://isaacjorquera5823-dev.github.io/brimahd-qas/ — repo https://github.com/isaacjorquera5823-dev/brimahd-qas (ver "Ambientes" abajo)
 - ⚠️ StackBlitz (`vitejs-vite-wyjjaygg`) está desincronizado — **no usar**, editar directo en el repo.
+
+## Ambientes (DEV → QAS → PRD)
+Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
+
+| Ambiente | Dónde | Cómo se publica |
+|---|---|---|
+| **DEV** | `npm run dev` en el PC, opcionalmente expuesto al celular con túnel `cloudflared tunnel --url http://localhost:PUERTO` (exe en `%LOCALAPPDATA%\Programs\cloudflared\`). URL `*.trycloudflare.com` aleatoria y temporal: muere al cerrar el PC/la sesión. **No dársela a terceros.** | — |
+| **QAS** | https://isaacjorquera5823-dev.github.io/brimahd-qas/ | Repo separado `brimahd-qas` (carpeta local `otros/brimahd-qas`), solo contiene el workflow + archivo `RAMA`. El workflow hace checkout de `Brimahd-inspeccion` en la rama que diga `RAMA`, build con `vite build --mode qas --base /brimahd-qas/` y publica en Pages. Se dispara al pushear al repo QAS, o a mano (Actions → Publicar QAS → Run workflow) para traer commits nuevos de la misma rama — **un push a la rama de la app NO actualiza QAS solo**. |
+| **PRD** | https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/ | Push a `main` del repo app (`.github/workflows/deploy.yml`). Requiere confirmación explícita de Isaac. |
+
+- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026): las ramas se prueban ahí antes de PRD, y la combinación de ramas se prueba ahí antes de fusionar. Octubre 2026: `RAMA` = `test-pdf`, entregado a Emanuel para probar.
+- **Modo prueba** (`MODO_PRUEBA` en `App.jsx` = `import.meta.env.DEV || MODE === "qas"`), activo en DEV y QAS, nunca en PRD (el build normal lo elimina; verificado buscando "Modo prueba" en `dist/`):
+  - `reserveNextNumber()` no consume el contador: devuelve `PRUEBA-XXXX` con el próximo número solo mirado. Aviso amarillo "Modo prueba" en Inicio.
+  - Almacenamiento con sufijo `_qas` (`brimahd_db_qas`, `brimahd_config_qas`): QAS y PRD comparten dominio (`isaacjorquera5823-dev.github.io`) y por lo tanto IndexedDB/localStorage — sin el sufijo, probar en QAS podía pisar un borrador real a medio llenar en PRD.
+  - El workflow de QAS se niega a publicar si el build no contiene `brimahd_db_qas` (seguro contra gastar números reales).
+  - Hoy existe en `test-pdf` (DEV+QAS) y en `diseno-visual` (solo la parte del contador, solo DEV — sin sufijo de almacenamiento ni modo `qas`; agregarlo antes de cargar esa rama en QAS).
+- ⚠️ **Firestore es uno solo para todos los ambientes.** El modo prueba protege el contador, pero el maestro de observaciones (`config/observacionesMaestro`) sí escribe en datos reales desde QAS, y "Enviar informe" manda correos/WhatsApp reales. Mejora futura: proyecto Firebase separado para QAS.
+- El repo app vive dentro de OneDrive: `npm install` reescribe miles de archivos en `node_modules` y OneDrive pide confirmar "eliminar N elementos" — es seguro eliminarlos (son regenerables). A futuro conviene mover los repos fuera de OneDrive.
 
 ## Stack
 - React + Vite (JavaScript), fuente en `src/App.jsx`
@@ -115,6 +134,8 @@ Todo lo de esta sección vive **solo** en la rama `test-pdf` del repo. Lo que co
 ## Pendiente
 - Historial de informes en Firestore (ya está la infraestructura, falta extenderla más allá del contador)
 - Probar en terreno y fusionar (o no) la rama `test-pdf` — ver sección "🧪 En pruebas" arriba. Requiere confirmación explícita de Isaac antes de fusionar a `main`.
-- Rediseño visual (íconos de línea, botones/tarjetas con más sombra, pantalla de Bienvenida, modo oscuro con toggle): esto va un paso *antes* incluso de `test-pdf` — solo existe como mockup aprobado (Artifact fuera del repo), todavía no se aplicó a ningún código. Ver "Lenguaje visual / diseño" arriba para el objetivo.
+- Rediseño visual (íconos de línea, pantalla de Bienvenida, modo oscuro con toggle, stepper de 2 pasos, hojas inferiores): **ya implementado en la rama `diseno-visual`** (no en esta rama), pendiente de prueba de Isaac y fusión. Ver el CLAUDE.md de esa rama para el detalle.
+- Orden acordado para fusionar (oct 2026): 1) traer `main` a ambas ramas ✅ · 2) probar y fusionar `diseno-visual` · 3) adaptar `test-pdf` al rediseño — los dos `src/theme.js` chocan, unificarlos cuidando que el PDF mantenga colores fijos y no siga el modo oscuro · 4) revisar reglas de Firebase antes de fusionar `test-pdf` (opción: separar el maestro de observaciones y fusionar primero solo PDF + botón enviar) · 5) consolidar CLAUDE.md.
+- `npm run build` (que corre `tsc -b`) falla por `src/main.tsx` importando `./index.css` sin declaración de tipos — preexistente, no afecta el deploy (que usa `npx vite build` directo).
 - Logo real de Brimahd: en esa misma discusión de diseño se decidió sacar el ícono dibujado a mano de la app hasta tener el definitivo — también pendiente de aplicar al código (por ahora la marca seguiría siendo solo texto)
 - Mejora de redacción con IA (requiere backend, evaluar Firebase Functions ya que Firebase ya está en el proyecto)
