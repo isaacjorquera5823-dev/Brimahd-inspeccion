@@ -8,6 +8,9 @@ html, body {
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
+  /* clip evita el scroll lateral igual que hidden, pero sin convertir html/body en
+     contenedores de scroll: con hidden, las barras position:sticky de abajo nunca se pegan. */
+  overflow-x: clip;
   -webkit-text-size-adjust: 100%;
   color-scheme: light;
 }
