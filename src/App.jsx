@@ -1141,11 +1141,11 @@ ${criticasRows.length > 0 ? `
     const fieldRowLabel = { fontSize: 10, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px", fontFamily: FONT, marginBottom: 3, display: "block" };
     const fieldRowValue = { fontSize: 13, fontWeight: 600, color: t.text, fontFamily: FONT };
     const fieldRowPlaceholder = { ...fieldRowValue, fontWeight: 500, color: t.textFaint };
-    const stickyBar = { position: "sticky", bottom: 0, background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 };
+    const stickyBar = { position: "sticky", bottom: 0, marginTop: "auto", background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 };
     const personalTexto = informe.personal.filter(Boolean).join(", ");
 
     return (
-    <div style={s.app}>
+    <div style={{ ...s.app, display: "flex", flexDirection: "column" }}>
       <div style={s.header}>
         <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
         <button
@@ -1358,7 +1358,7 @@ ${criticasRows.length > 0 ? `
     })).filter(g => g.items.length > 0);
 
     return (
-      <div style={s.app}>
+      <div style={{ ...s.app, display: "flex", flexDirection: "column" }}>
         <div style={s.header}>
           <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
           <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }}
@@ -1434,7 +1434,7 @@ ${criticasRows.length > 0 ? `
           </details>
           <div style={{ height: 68 }} />
         </div>
-        <div style={{ position: "sticky", bottom: 0, background: t.header, borderTop: `1px solid ${t.border}`, padding: "10px 16px 12px", zIndex: 20 }}>
+        <div style={{ position: "sticky", bottom: 0, marginTop: "auto", background: t.header, borderTop: `1px solid ${t.border}`, padding: "10px 16px 12px", zIndex: 20 }}>
           <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: t.headerTextDim, marginBottom: 8 }}>
             {reg.observaciones.length} seleccionada{reg.observaciones.length === 1 ? "" : "s"}
           </div>
@@ -1452,7 +1452,7 @@ ${criticasRows.length > 0 ? `
   ].filter(Boolean).join(" · ");
 
   return (
-    <div style={s.app}>
+    <div style={{ ...s.app, display: "flex", flexDirection: "column" }}>
       <div style={s.header}>
         <span style={{ fontSize: 14, fontWeight: 700, color: t.headerText, fontFamily: FONT }}>Brimahd ltda.</span>
         <button style={{ ...s.btn, background: t.headerBtnBg, color: t.headerText, fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("informe")}><ArrowLeft size={15} /> Volver</button>
@@ -1590,7 +1590,7 @@ ${criticasRows.length > 0 ? `
         })}
         <div style={{ height: 68 }} />
       </div>
-      <div style={{ position: "sticky", bottom: 0, background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 }}>
+      <div style={{ position: "sticky", bottom: 0, marginTop: "auto", background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 }}>
         <button style={{ ...s.btn, ...s.btnGhost, flex: 1 }} onClick={addRegistro}>
           <Plus size={15} /> Registro
         </button>
