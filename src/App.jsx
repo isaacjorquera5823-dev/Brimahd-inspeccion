@@ -128,10 +128,19 @@ const emptyRegistro = () => ({
 // IndexedDB no tiene ese límite tan bajo (normalmente cientos de MB o más,
 // según espacio libre del dispositivo), así que es el lugar correcto para
 // guardar el borrador completo de una inspección grande.
-const DB_NAME = "brimahd_db";
+// Modo prueba: activo en el servidor de desarrollo (npm run dev / túnel) y en el
+// ambiente QAS (vite build --mode qas), nunca en PRD (vite build normal).
+// - No gasta números reales del contador (ver reserveNextNumber).
+// - Guarda borrador y configuración con nombres propios: QAS y PRD viven en el
+//   mismo dominio (isaacjorquera5823-dev.github.io), y sin esto compartirían el
+//   mismo IndexedDB/localStorage, así que una prueba podría pisar un borrador real.
+const MODO_PRUEBA = import.meta.env.DEV || import.meta.env.MODE === "qas";
+const SUFIJO_PRUEBA = MODO_PRUEBA ? "_qas" : "";
+
+const DB_NAME = "brimahd_db" + SUFIJO_PRUEBA;
 const DB_STORE = "borrador";
 const DB_KEY = "actual";
-const BORRADOR_KEY_LEGACY = "brimahd_borrador_informe"; // clave antigua en localStorage, para migrar borradores previos
+const BORRADOR_KEY_LEGACY = "brimahd_borrador_informe" + SUFIJO_PRUEBA; // clave antigua en localStorage, para migrar borradores previos
 
 function abrirDB() {
   return new Promise((resolve, reject) => {
@@ -268,11 +277,6 @@ async function peekNextNumber() {
   const valor = snap.exists() ? snap.data().valor : 1;
   return `INF-${String(valor).padStart(4, "0")}`;
 }
-
-// Modo prueba: solo en el servidor de desarrollo (npm run dev / túnel), nunca en la app
-// publicada (vite build deja import.meta.env.DEV en false). Evita gastar números reales
-// del contador al probar el flujo completo desde el celular.
-const MODO_PRUEBA = import.meta.env.DEV;
 
 // Reserva y consume el siguiente número de forma atómica (a prueba de choques entre celulares)
 async function reserveNextNumber() {
@@ -473,7 +477,7 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
 
 export default function App() {
   const [screen, setScreen] = useState("inicio");
-  const [config, setConfig] = useLocalStorage("brimahd_config", defaultConfig);
+  const [config, setConfig] = useLocalStorage("brimahd_config" + SUFIJO_PRUEBA, defaultConfig);
   const [informe, setInforme] = useState(null);
   const [editIdx, setEditIdx] = useState(null);
   const [tableroEdit, setTableroEdit] = useState(null);
