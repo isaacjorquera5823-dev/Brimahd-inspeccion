@@ -55,7 +55,22 @@ Isaac es el desarrollador y dueño del código/IP. Emanuel Madrid Valenzuela (du
 - **Presentación comercial:** https://isaacjorquera5823-dev.github.io/brimahd-presentacion/
 - **Repo app:** https://github.com/isaacjorquera5823-dev/Brimahd-inspeccion
 - **Repo presentación:** https://github.com/isaacjorquera5823-dev/brimahd-presentacion
+- **QAS (pruebas):** https://isaacjorquera5823-dev.github.io/brimahd-qas/ — repo https://github.com/isaacjorquera5823-dev/brimahd-qas (ver "Ambientes" abajo)
+- **Demo interactiva del rediseño (para Emanuel):** https://claude.ai/artifact/BkHwASVbC1jKhuJXsJaMVm — ver "Demo interactiva" en la sección 🎨
 - ⚠️ StackBlitz (`vitejs-vite-wyjjaygg`) está desincronizado — **no usar**, editar directo en el repo.
+
+## Ambientes (DEV → QAS → PRD)
+Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
+
+| Ambiente | Dónde | Cómo se publica |
+|---|---|---|
+| **DEV** | `npm run dev` en el PC, opcionalmente expuesto al celular con `cloudflared tunnel --url http://localhost:PUERTO` (exe en `%LOCALAPPDATA%\Programs\cloudflared\`). URL `*.trycloudflare.com` aleatoria y temporal: muere al cerrar el PC/la sesión. **No dársela a terceros.** | — |
+| **QAS** | https://isaacjorquera5823-dev.github.io/brimahd-qas/ | Repo separado `brimahd-qas` (carpeta local `otros/brimahd-qas`) con solo el workflow + archivo `RAMA`. El workflow hace checkout de `Brimahd-inspeccion` en la rama de `RAMA`, build con `vite build --mode qas --base /brimahd-qas/` y publica en Pages. Se dispara al pushear al repo QAS o a mano (Actions → Publicar QAS → Run workflow) — **un push a la rama de la app NO actualiza QAS solo**. |
+| **PRD** | https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/ | Push a `main` del repo app. Requiere confirmación explícita de Isaac. |
+
+- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026). Octubre 2026: `RAMA` = `test-pdf`, entregado a Emanuel. No cambiar a `diseno-visual` mientras Emanuel esté probando el PDF, y avisarle cuando cambie.
+- **Modo prueba** (`MODO_PRUEBA` = `import.meta.env.DEV || MODE === "qas"`), activo en DEV y QAS, nunca en PRD: `reserveNextNumber()` devuelve `PRUEBA-XXXX` sin consumir el contador, aviso amarillo en Inicio, y almacenamiento con sufijo `_qas` (`brimahd_db_qas`, `brimahd_config_qas`, `brimahd_tema_oscuro_qas`) porque QAS y PRD comparten dominio y por lo tanto IndexedDB/localStorage. El workflow de QAS se niega a publicar si el build no contiene `brimahd_db_qas`. Al unificar ramas, conservar los tres sufijos.
+- ⚠️ Firestore es uno solo para todos los ambientes: el modo prueba protege el contador, pero no lo demás.
 
 ## Stack
 - React + Vite (JavaScript), fuente en `src/App.jsx`
@@ -94,6 +109,8 @@ Isaac es el desarrollador y dueño del código/IP. Emanuel Madrid Valenzuela (du
 - **Kill switch en modo "fail-open"**: si el doc de Firestore no existe, la app debe cargar igual (no auto-bloquearse por error de config).
 - **Hooks de React nunca dentro de returns condicionales**: causó Error #310 (pantalla en blanco en mobile). Se resolvió inlineando JSX en los `.map()` en vez de sub-componentes con `useState` propio.
 - **Vite bloquea hosts desconocidos por defecto**: para probar la app por un túnel HTTPS (cloudflared/ngrok) hay que agregar el host a `server.allowedHosts` en `vite.config.ts`, si no tira 403 "Blocked request". (Esto es sobre la herramienta de desarrollo, no sobre la app en sí.)
+- **`overflow-x: hidden` en `html`/`body` rompe `position: sticky`**: usar `overflow-x: clip`. Y un sticky abajo solo se pega si el contenido desborda; para que quede abajo también con poco contenido, el contenedor debe ser columna flex y la barra `marginTop: auto`.
+- **Una función de React que llama algo inexistente falla a medias**: los `setState` anteriores a la línea rota sí se aplican, los posteriores no — por eso la hoja de Sede completaba los datos pero no se cerraba. Ante un comportamiento "a medias", revisar la consola por `ReferenceError`.
 - **Para traer el código fuente actual**: `curl -s "https://raw.githubusercontent.com/isaacjorquera5823-dev/Brimahd-inspeccion/main/src/App.jsx"` — la API de GitHub para listar directorios tiene rate limit agresivo, evitarla.
 
 ## 🎨 En pruebas — rama `diseno-visual` (NO fusionada a `main`, NO probada en producción)
@@ -112,7 +129,7 @@ Segunda ronda de cambios en esta misma rama, esta vez de flujo/estructura, no so
 
 - **Inicio**: el aviso de "informe sin terminar" pasa de tarjeta siempre expandida a un `<details>` colapsado con un ícono "!" pulsante — toca para expandir. El botón "Crear nuevo informe" pasa a un círculo dorado grande con solo "+", "Nuevo informe" como texto chico debajo, y "Próximo informe · INF-XXXX" como badge aparte — sin tarjeta que los encierre, centrados verticalmente en el espacio disponible.
 - **Datos generales + Personal en terreno**: se fusionaron en un solo paso (`informeStep === 0`) de un stepper de 2 pasos (antes: Cliente / Personal / Próxima mantención / Tableros todo en una sola pantalla larga). Tableros es el paso 2 (`informeStep === 1`). Barra de progreso de 2 segmentos arriba, "Atrás"/"Siguiente" fijos abajo.
-  - **Sede** deja el `<select>` nativo y pasa a una fila que abre una hoja inferior (`sedeSheetOpen`) con buscador (reutiliza `sedeSearch`/`sedesFiltradas`, ya existían pero estaban sin usar) — selecciona y autocompleta Contacto/Dirección igual que antes (`selectSede`).
+  - **Sede** deja el `<select>` nativo y pasa a un campo que abre una hoja inferior (`sedeSheetOpen`) con buscador (reutiliza `sedeSearch`/`sedesFiltradas`). Tocar una sede la aplica de inmediato (`selectSede`: autocompleta Contacto/Dirección, limpia el buscador y cierra la hoja) — sin paso de confirmación, pedido explícito de Isaac.
   - **Personal en terreno** deja el patrón de N `<select>` + botón "Agregar técnico" y pasa a una fila que abre una hoja inferior (`tecSheetOpen`) con los 3 técnicos como filas tocables (multi-selección). Nueva función `toggleTecnico(nombre)` reemplaza a `addPersonal`/`updatePersonal`/`removePersonal` (eliminadas). `informe.personal` ahora es simplemente el arreglo de nombres seleccionados (default `[]`, antes `[""]`).
   - Contacto/Dirección siguen siendo inputs de texto normales. "Fecha" se renombró a "Fecha de servicio" para no confundirse con "Próxima mantención" (que sigue igual, Mes/Año).
 - **Tableros**: cada tarjeta se puede deslizar hacia la izquierda (`onTouchStart/Move/End`, estado `swipedTablero` + `swipeRef`) para revelar "Eliminar"; tocar la tarjeta (sin deslizar) abre el tablero para editar. "Agregar tablero" pasa de botón fantasma al final de la lista a un botón flotante circular fijo (`position:fixed`) en la esquina inferior derecha. "Generar informe" queda en una barra fija abajo.
@@ -122,6 +139,20 @@ Segunda ronda de cambios en esta misma rama, esta vez de flujo/estructura, no so
 - **Vista previa / Enviar**: se unificaron dos pantallas en una. Antes: `VistaPreviaInforme` con 3 botones apretados en el header (Descargar/Enviar/Finalizar) que al tocar "Enviar" navegaba a una pantalla aparte (`screen === "preview" && enviarScreen`) con el aviso "asegúrate de haber descargado antes" + botones de WhatsApp/Email. Ahora todo vive dentro de `VistaPreviaInforme`: una franja de KPIs (tableros/críticas/registros) sobre el iframe real (que sigue siendo el documento completo, sin recortar), y una barra fija abajo con "Finalizar" + "Enviar informe" — este último abre una hoja inferior propia del componente (estado local `enviarOpen`) con las 3 opciones (WhatsApp, Email, Descargar HTML). El estado `enviarScreen`/`setEnviarScreen` de `App()` se eliminó por completo; `VistaPreviaInforme` ahora recibe `compartirWhatsApp` y `enviarEmail` como props además de `descargarHTML`.
 - Nada de esto toca `generarHTMLInforme()` ni el documento final — sigue siendo solo la capa de la app.
 - Pendiente: probar el flujo completo en iPhone/Safari real (especialmente el swipe) antes de considerar esta rama lista para fusionar.
+
+### Ajustes de octubre 2026 (commits `9ead3ff`…`4344d85`)
+- **Modo prueba completo** (ver "Ambientes" arriba).
+- **Regla de diseño — campos uniformes** (pedido de Isaac): todo lo que sea un campo usa el mismo patrón que "Contacto": etiqueta arriba con `s.label` (11px, mayúsculas) y valor en un recuadro de 16px. Para campos que abren una hoja inferior se usa el estilo `s.picker` (mismo recuadro que `s.input` + chevron) con `s.pickerValue(vacio)`; así quedaron Sede, Personal en terreno, Identificación del tablero y Observaciones del registro. "Próxima mantención" dejó de ser tarjeta con título propio: es etiqueta + dos selects. Textos de interruptores con `s.toggleText(activo, color)` (16px) y opciones de las hojas inferiores a 16px. **Cualquier campo nuevo debe seguir este patrón**; no volver a filas con etiqueta interna de 10px y valor en negrita de 13px.
+- **Bug: la hoja de Sede no se cerraba.** `selectSede` llamaba a `setSedeFocused`, que no existía (resto del selector anterior): completaba los datos y luego lanzaba `ReferenceError`, sin llegar a cerrar la hoja ni limpiar el buscador.
+- **Bug: las barras inferiores no quedaban fijas.** Dos causas: (1) con `position: sticky; bottom: 0` y poco contenido, la barra quedaba a media pantalla → las pantallas de informe, tablero y observaciones pasan a columna flex y la barra usa `marginTop: "auto"`; (2) `overflow-x: hidden` en `html, body` (`src/index.css`, viene de `main`) convierte a `body` en contenedor de scroll y el sticky nunca se pega → cambiado a `overflow-x: clip` (el minificador deja solo `clip`: iOS 16+; en iOS anteriores solo se pierde la protección contra scroll lateral).
+- Corregido el plural "observaciónes".
+
+### Demo interactiva para Emanuel (oct 2026)
+- Artifact privado en claude.ai (https://claude.ai/artifact/BkHwASVbC1jKhuJXsJaMVm) — Isaac debe compartirlo desde "Compartir" para que Emanuel lo abra.
+- Contiene **la app real de esta rama** dentro de un marco de iPhone (iframe a `app/index.html`, mismo origen), con un recorrido de 6 pasos (C1–C6), selector Oscuro/Claro (escribe `brimahd_tema_oscuro` y recarga el iframe), "Reiniciar demo", y secciones "Lo que no cambia" / "Próximos pasos".
+- La app se compila en **modo `demo`** desde una copia fuera del repo (no se commitea nada de esto): `MODO_DEMO = MODE === "demo"` hace que `checkLicencia` devuelva activa y `peekNextNumber`/`reserveNextNumber` devuelvan `INF-0107` sin tocar Firestore; `alert()` se reemplaza por un aviso dentro de la app (los artifacts no muestran `alert`). Build: `vite build --mode demo --base ./`.
+- La página siembra en IndexedDB (`brimahd_db`) un informe de ejemplo de Sede Alameda con 4 tableros (Crítica / Media / Leve en garantía / Media) y fotos de tableros dibujadas con canvas, marcadas "Foto ilustrativa" (no hay fotos reales de tableros en el proyecto).
+- Para actualizarla tras cambios en la rama: recompilar en modo demo con el código nuevo y republicar el mismo artifact (mismo URL).
 
 ## 🧪 En pruebas — rama `test-pdf` (NO fusionada a `main`, NO probada en producción)
 Todo lo de esta sección vive **solo** en la rama `test-pdf` del repo. Lo que corre hoy en producción (`main`, `https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/`) sigue exactamente como está descrito en las secciones de arriba: descarga en HTML, sin maestro de observaciones, sin botón único de enviar. No tratar nada de lo siguiente como parte de la app terminada — es trabajo en curso, pendiente de que Isaac lo pruebe en su celular y confirme explícitamente la fusión a `main`.
@@ -142,5 +173,7 @@ Todo lo de esta sección vive **solo** en la rama `test-pdf` del repo. Lo que co
 - Historial de informes en Firestore (ya está la infraestructura, falta extenderla más allá del contador)
 - Probar en terreno y fusionar (o no) la rama `test-pdf` — ver sección "🧪 En pruebas" arriba. Requiere confirmación explícita de Isaac antes de fusionar a `main`.
 - Probar en terreno y fusionar (o no) la rama `diseno-visual` — ver sección "🎨 En pruebas" arriba. Ya implementado en código, requiere confirmación explícita de Isaac antes de fusionar a `main`. Si se fusiona antes que `test-pdf`, esa rama va a necesitar traer el rediseño (sigue basada en el diseño original).
+- Orden acordado para fusionar (oct 2026): 1) traer `main` a ambas ramas ✅ · 2) probar y fusionar `diseno-visual` (Emanuel ya tiene la demo interactiva) · 3) adaptar `test-pdf` al rediseño — los dos `src/theme.js` chocan, unificarlos cuidando que el PDF mantenga colores fijos y no siga el modo oscuro; el botón "Enviar informe" y el maestro de observaciones de `test-pdf` deben seguir la regla de campos uniformes de esta rama · 4) revisar reglas de Firebase antes de fusionar `test-pdf` · 5) consolidar CLAUDE.md (cada rama tiene su copia).
+- `npm run build` (`tsc -b`) falla por `src/main.tsx` importando `./index.css` sin declaración de tipos — preexistente, no afecta el deploy (usa `npx vite build`).
 - Logo real de Brimahd: en esa misma discusión de diseño se decidió sacar el ícono dibujado a mano de la app hasta tener el definitivo — también pendiente de aplicar al código (por ahora la marca seguiría siendo solo texto)
 - Mejora de redacción con IA (requiere backend, evaluar Firebase Functions ya que Firebase ya está en el proyecto)
