@@ -272,8 +272,17 @@ async function peekNextNumber() {
   return `INF-${String(valor).padStart(4, "0")}`;
 }
 
+// Modo prueba: solo en el servidor de desarrollo (npm run dev / túnel), nunca en la app
+// publicada (vite build deja import.meta.env.DEV en false). Evita gastar números reales
+// del contador al probar el flujo completo desde el celular.
+const MODO_PRUEBA = import.meta.env.DEV;
+
 // Reserva y consume el siguiente número de forma atómica (a prueba de choques entre celulares)
 async function reserveNextNumber() {
+  if (MODO_PRUEBA) {
+    const proximo = await peekNextNumber();
+    return proximo.replace("INF-", "PRUEBA-");
+  }
   const valorReservado = await runTransaction(db, async (tx) => {
     const snap = await tx.get(contadorRef);
     const actual = snap.exists() ? snap.data().valor : 1;
@@ -1061,6 +1070,11 @@ ${criticasRows.length > 0 ? `
               </div>
             </div>
           </details>
+        )}
+        {MODO_PRUEBA && (
+          <div style={{ background: t.aviso.bg, color: t.aviso.text, border: `1px solid ${t.aviso.border}`, borderRadius: 14, padding: "10px 12px", fontSize: 12.5, textAlign: "center", lineHeight: 1.5, flexShrink: 0 }}>
+            <strong>Modo prueba</strong> · los informes se numeran como PRUEBA-XXXX y no gastan números reales
+          </div>
         )}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <button
