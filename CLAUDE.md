@@ -72,7 +72,7 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
   - `reserveNextNumber()` no consume el contador: devuelve `PRUEBA-XXXX` con el próximo número solo mirado. Aviso amarillo "Modo prueba" en Inicio.
   - Almacenamiento con sufijo `_qas` (`brimahd_db_qas`, `brimahd_config_qas`): QAS y PRD comparten dominio (`isaacjorquera5823-dev.github.io`) y por lo tanto IndexedDB/localStorage — sin el sufijo, probar en QAS podía pisar un borrador real a medio llenar en PRD.
   - El workflow de QAS se niega a publicar si el build no contiene `brimahd_db_qas` (seguro contra gastar números reales).
-  - Hoy existe en `test-pdf` (DEV+QAS) y en `diseno-visual` (solo la parte del contador, solo DEV — sin sufijo de almacenamiento ni modo `qas`; agregarlo antes de cargar esa rama en QAS).
+  - Existe completo (DEV+QAS, contador + almacenamiento separado) en `test-pdf` y en `diseno-visual`; en esta última también la preferencia de tema (`brimahd_tema_oscuro_qas`). Al unificar las ramas, conservar los tres sufijos.
 - ⚠️ **Firestore es uno solo para todos los ambientes.** El modo prueba protege el contador, pero el maestro de observaciones (`config/observacionesMaestro`) sí escribe en datos reales desde QAS, y "Enviar informe" manda correos/WhatsApp reales. Mejora futura: proyecto Firebase separado para QAS.
 - El repo app vive dentro de OneDrive: `npm install` reescribe miles de archivos en `node_modules` y OneDrive pide confirmar "eliminar N elementos" — es seguro eliminarlos (son regenerables). A futuro conviene mover los repos fuera de OneDrive.
 
