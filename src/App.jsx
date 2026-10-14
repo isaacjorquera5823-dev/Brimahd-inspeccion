@@ -574,8 +574,8 @@ export default function App() {
     updateInforme("cliente", sede.nombre);
     updateInforme("contacto", sede.contacto);
     updateInforme("direccion", sede.direccion);
-    setSedeSearch(sede.nombre);
-    setSedeFocused(false);
+    setSedeSearch("");
+    setSedeSheetOpen(false);
   }
 
   const sedesFiltradas = SEDES.filter(s =>
@@ -992,6 +992,10 @@ ${criticasRows.length > 0 ? `
     label: { fontSize: 11, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "block", fontFamily: FONT },
     input: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: t.text, background: t.inputBg },
     select: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, WebkitAppearance: "none", appearance: "none", color: t.text, background: t.inputBg },
+    // Campo que abre una hoja inferior (Sede, Personal, Observaciones…): mismo recuadro y letra que un input
+    picker: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 10, fontFamily: FONT, color: t.text, background: t.inputBg, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", textAlign: "left", lineHeight: "normal" },
+    pickerValue: (vacio) => ({ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: vacio ? t.textFaint : t.text }),
+    toggleText: (activo, color) => ({ fontSize: 16, fontWeight: activo ? 600 : 400, color: activo ? color : t.text }),
     textarea: { width: "100%", padding: "9px 11px", border: `1px solid ${t.border}`, borderRadius: 10, fontSize: 16, boxSizing: "border-box", marginBottom: 6, minHeight: 80, resize: "vertical", fontFamily: FONT, color: t.text, background: t.inputBg },
     btn: { padding: "10px 18px", borderRadius: 14, border: "none", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: FONT, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 },
     btnPrimary: { background: t.modo === "light" ? "#2c2c2c" : "#333333", color: "#ffffff" },
@@ -1137,10 +1141,6 @@ ${criticasRows.length > 0 ? `
 
   if (screen === "informe" && informe) {
 
-    const fieldRow = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: 10 };
-    const fieldRowLabel = { fontSize: 10, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px", fontFamily: FONT, marginBottom: 3, display: "block" };
-    const fieldRowValue = { fontSize: 13, fontWeight: 600, color: t.text, fontFamily: FONT };
-    const fieldRowPlaceholder = { ...fieldRowValue, fontWeight: 500, color: t.textFaint };
     const stickyBar = { position: "sticky", bottom: 0, marginTop: "auto", background: t.header, borderTop: `1px solid ${t.border}`, padding: "12px 16px", display: "flex", gap: 10, zIndex: 20 };
     const personalTexto = informe.personal.filter(Boolean).join(", ");
 
@@ -1171,13 +1171,11 @@ ${criticasRows.length > 0 ? `
 
       {informeStep === 0 && (
         <div style={s.body}>
-          <div style={fieldRow} onClick={() => { setSedeSearch(""); setSedeSheetOpen(true); }}>
-            <div>
-              <span style={fieldRowLabel}>Sede</span>
-              <span style={informe.cliente ? fieldRowValue : fieldRowPlaceholder}>{informe.cliente || "— Seleccionar sede —"}</span>
-            </div>
-            <ChevronRight size={16} style={{ color: t.textFaint }} />
-          </div>
+          <label style={s.label}>Sede</label>
+          <button type="button" style={s.picker} onClick={() => { setSedeSearch(""); setSedeSheetOpen(true); }}>
+            <span style={s.pickerValue(!informe.cliente)}>{informe.cliente || "Seleccionar sede"}</span>
+            <ChevronRight size={18} style={{ color: t.textFaint, flexShrink: 0 }} />
+          </button>
           <label style={s.label}>Contacto</label>
           <input style={s.input} value={informe.contacto} onChange={e => updateInforme("contacto", e.target.value)} placeholder="Nombre del contacto" />
           <label style={s.label}>Dirección</label>
@@ -1185,17 +1183,14 @@ ${criticasRows.length > 0 ? `
           <label style={s.label}>Fecha de servicio</label>
           <input style={s.input} type="date" value={informe.fecha} onChange={e => updateInforme("fecha", e.target.value)} />
 
-          <div style={{ ...fieldRow, marginTop: 2 }} onClick={() => setTecSheetOpen(true)}>
-            <div>
-              <span style={fieldRowLabel}>Personal en terreno</span>
-              <span style={personalTexto ? fieldRowValue : fieldRowPlaceholder}>{personalTexto || "— Seleccionar técnicos —"}</span>
-            </div>
-            <ChevronRight size={16} style={{ color: t.textFaint }} />
-          </div>
+          <label style={s.label}>Personal en terreno</label>
+          <button type="button" style={s.picker} onClick={() => setTecSheetOpen(true)}>
+            <span style={s.pickerValue(!personalTexto)}>{personalTexto || "Seleccionar técnicos"}</span>
+            <ChevronRight size={18} style={{ color: t.textFaint, flexShrink: 0 }} />
+          </button>
 
-          <div style={s.card}>
-            <div style={s.sectionTitle}>Próxima mantención</div>
-            <label style={s.label}>Fecha próxima visita</label>
+          <div>
+            <label style={s.label}>Próxima mantención</label>
             <div style={s.row}>
               <select
                 style={{ ...s.select, flex: 1, marginBottom: 0 }}
@@ -1302,8 +1297,8 @@ ${criticasRows.length > 0 ? `
               {sedesFiltradas.map(sede => (
                 <div
                   key={sede.nombre}
-                  onClick={() => { selectSede(sede); setSedeSheetOpen(false); }}
-                  style={{ padding: "11px 12px", borderRadius: 10, marginBottom: 6, fontSize: 13, fontWeight: sede.nombre === informe.cliente ? 700 : 500, background: sede.nombre === informe.cliente ? "rgba(227,180,25,.14)" : t.surface, color: sede.nombre === informe.cliente ? ACCENT : t.text, cursor: "pointer" }}
+                  onClick={() => selectSede(sede)}
+                  style={{ padding: "12px 12px", borderRadius: 10, marginBottom: 6, fontSize: 16, fontWeight: sede.nombre === informe.cliente ? 600 : 400, background: sede.nombre === informe.cliente ? "rgba(227,180,25,.14)" : t.surface, color: sede.nombre === informe.cliente ? ACCENT : t.text, cursor: "pointer" }}
                 >{sede.nombre}</div>
               ))}
             </div>
@@ -1323,7 +1318,7 @@ ${criticasRows.length > 0 ? `
                 <div
                   key={tec}
                   onClick={() => toggleTecnico(tec)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 12px", borderRadius: 10, marginBottom: 6, fontSize: 13, fontWeight: sel ? 700 : 500, background: sel ? "rgba(227,180,25,.14)" : t.surface, color: sel ? ACCENT : t.text, cursor: "pointer" }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 12px", borderRadius: 10, marginBottom: 6, fontSize: 16, fontWeight: sel ? 600 : 400, background: sel ? "rgba(227,180,25,.14)" : t.surface, color: sel ? ACCENT : t.text, cursor: "pointer" }}
                 >{tec}{sel && <Check size={15} />}</div>
               );
             })}
@@ -1463,13 +1458,11 @@ ${criticasRows.length > 0 ? `
       <div style={s.body}>
 
         {/* ── Datos del tablero ── */}
+        <label style={s.label}>Identificación</label>
         <details open={editIdx === null} style={{ marginBottom: 14 }}>
-          <summary style={{ listStyle: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "11px 13px" }}>
-            <div>
-              <div style={{ fontSize: 10, color: t.textDim, textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: 3, fontFamily: FONT }}>Identificación</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>{identResumen || "Sin completar"}</div>
-            </div>
-            <ChevronRight size={16} style={{ color: t.textFaint }} />
+          <summary style={{ ...s.picker, listStyle: "none", marginBottom: 0 }}>
+            <span style={s.pickerValue(!identResumen)}>{identResumen || "Sin completar"}</span>
+            <ChevronRight size={18} style={{ color: t.textFaint, flexShrink: 0 }} />
           </summary>
           <div style={{ ...s.card, marginTop: 8 }}>
             <label style={s.label}>Zona</label>
@@ -1505,7 +1498,7 @@ ${criticasRows.length > 0 ? `
               <input style={s.input} value={tableroEdit.marcaOtro} onChange={e => setTableroEdit(p => ({ ...p, marcaOtro: e.target.value }))} placeholder="Escribe la marca" />
             )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: tableroEdit.garantia ? t.garantia.bg : t.surfaceAlt, borderRadius: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: tableroEdit.garantia ? 700 : 400, color: tableroEdit.garantia ? t.garantia.text : t.textDim }}>Tablero en garantía</span>
+              <span style={s.toggleText(tableroEdit.garantia, t.garantia.text)}>Tablero en garantía</span>
               <button onClick={() => setTableroEdit(p => ({ ...p, garantia: !p.garantia }))}
                 style={{ width: 52, height: 28, borderRadius: 14, background: tableroEdit.garantia ? t.garantia.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
                 <div style={{ position: "absolute", top: 4, left: tableroEdit.garantia ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
@@ -1542,7 +1535,7 @@ ${criticasRows.length > 0 ? `
                   </button>
                 )}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "10px 12px", background: reg.sinObservaciones ? t.exito.bg : t.surfaceAlt, borderRadius: 12 }}>
-                  <span style={{ fontSize: 13, fontWeight: reg.sinObservaciones ? 700 : 400, color: reg.sinObservaciones ? t.exito.text : t.textDim }}>Sin observaciones</span>
+                  <span style={s.toggleText(reg.sinObservaciones, t.exito.text)}>Sin observaciones</span>
                   <button onClick={() => toggleSinObservaciones(regIdx)}
                     style={{ width: 52, height: 28, borderRadius: 14, background: reg.sinObservaciones ? t.exito.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
                     <div style={{ position: "absolute", top: 4, left: reg.sinObservaciones ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
@@ -1555,13 +1548,12 @@ ${criticasRows.length > 0 ? `
                   </div>
                 ) : (
                   <>
-                    <button
-                      onClick={() => setObsPicker({ regIdx })}
-                      style={{ ...s.btnGhost, width: "100%", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px" }}>
-                      <span style={{ fontSize: 13, color: reg.observaciones.length > 0 ? t.text : t.textFaint }}>
-                        {reg.observaciones.length > 0 ? `${reg.observaciones.length} ${reg.observaciones.length > 1 ? "observaciones" : "observación"} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones…"}
+                    <label style={s.label}>Observaciones</label>
+                    <button type="button" onClick={() => setObsPicker({ regIdx })} style={s.picker}>
+                      <span style={s.pickerValue(reg.observaciones.length === 0)}>
+                        {reg.observaciones.length > 0 ? `${reg.observaciones.length} ${reg.observaciones.length > 1 ? "observaciones" : "observación"} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones"}
                       </span>
-                      <ChevronRight size={15} style={{ color: t.textFaint }} />
+                      <ChevronRight size={18} style={{ color: t.textFaint, flexShrink: 0 }} />
                     </button>
                     {reg.observaciones.length > 0 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
@@ -1578,7 +1570,7 @@ ${criticasRows.length > 0 ? `
                   </>
                 )}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "10px 12px", background: reg.cambioTablero ? t.peligro.bg : t.surfaceAlt, borderRadius: 12 }}>
-                  <span style={{ fontSize: 13, fontWeight: reg.cambioTablero ? 700 : 400, color: reg.cambioTablero ? t.peligro.text : t.textDim }}>Se recomienda cambio de tablero</span>
+                  <span style={s.toggleText(reg.cambioTablero, t.peligro.text)}>Se recomienda cambio de tablero</span>
                   <button onClick={() => { const regs = [...tableroEdit.registros]; regs[regIdx] = { ...reg, cambioTablero: !reg.cambioTablero }; setTableroEdit(p => ({ ...p, registros: regs })); }}
                     style={{ width: 52, height: 28, borderRadius: 14, background: reg.cambioTablero ? t.peligro.solid : "#8a8a8a", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, padding: 0 }}>
                     <div style={{ position: "absolute", top: 4, left: reg.cambioTablero ? 26 : 4, width: 20, height: 20, borderRadius: "50%", background: "white" }} />
