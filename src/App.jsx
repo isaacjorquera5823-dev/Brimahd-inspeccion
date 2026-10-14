@@ -1559,7 +1559,7 @@ ${criticasRows.length > 0 ? `
                       onClick={() => setObsPicker({ regIdx })}
                       style={{ ...s.btnGhost, width: "100%", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px" }}>
                       <span style={{ fontSize: 13, color: reg.observaciones.length > 0 ? t.text : t.textFaint }}>
-                        {reg.observaciones.length > 0 ? `${reg.observaciones.length} observación${reg.observaciones.length > 1 ? "es" : ""} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones…"}
+                        {reg.observaciones.length > 0 ? `${reg.observaciones.length} ${reg.observaciones.length > 1 ? "observaciones" : "observación"} seleccionada${reg.observaciones.length > 1 ? "s" : ""}` : "Agregar observaciones…"}
                       </span>
                       <ChevronRight size={15} style={{ color: t.textFaint }} />
                     </button>
