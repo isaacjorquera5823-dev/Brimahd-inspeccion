@@ -235,6 +235,40 @@ function parametrosCompresion(totalFotosActuales) {
   return { maxDim: 1600, calidad: 0.72 };
 }
 
+// ===== Miniaturas para la vista previa =====
+// La vista previa mostraba cada foto a 1600px aunque en el celular se ve a
+// ~400px. El navegador descomprime cada imagen a tamaño completo (~7,7 MB
+// por foto de 1600x1200), así que un informe de 30 tableros sumaba ~220 MB
+// solo en imágenes y Safari en iPhone cerraba la pestaña (pantalla pegada en
+// "Generando…" y luego recarga). Para la vista previa se usan copias de
+// 900px, generadas de a una (nunca más de una foto grande en memoria a la
+// vez) y guardadas por foto para no rehacerlas al volver a la pantalla.
+// El PDF que se envía sigue usando las fotos originales.
+const MINIATURA_MAX = 900;
+const miniaturasCache = new WeakMap();
+
+function crearMiniatura(foto) {
+  if (miniaturasCache.has(foto)) return Promise.resolve(miniaturasCache.get(foto));
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const escala = Math.min(1, MINIATURA_MAX / Math.max(img.width, img.height));
+      if (escala === 1) { miniaturasCache.set(foto, foto.data); return resolve(foto.data); }
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      const mini = canvas.toDataURL("image/jpeg", 0.8);
+      canvas.width = canvas.height = 0; // libera el lienzo de inmediato (Safari lo retiene si no)
+      img.src = "";
+      miniaturasCache.set(foto, mini);
+      resolve(mini);
+    };
+    img.onerror = () => resolve(foto.data); // si falla, se usa la original
+    img.src = foto.data;
+  });
+}
+
 // ===== Contador correlativo compartido (Firebase Firestore) =====
 // Reemplaza estos valores por el bloque "firebaseConfig" que te entrega la consola de Firebase.
 const firebaseConfig = {
@@ -393,6 +427,7 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
   const [htmlInforme, setHtmlInforme] = useState(null);
   const [error, setError] = useState(false);
   const [generandoPDF, setGenerandoPDF] = useState(false);
+  const [progreso, setProgreso] = useState({ hechas: 0, total: 0 });
 
   // Si el navegador no soporta adjuntar archivos al panel nativo de
   // compartir (algunos navegadores de escritorio o Android antiguos), el
@@ -431,15 +466,25 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
   useEffect(() => {
     setHtmlInforme(null);
     setError(false);
-    const t = setTimeout(() => {
+    let cancelado = false;
+    (async () => {
       try {
-        const html = generarHTMLInforme(informe, config);
-        setHtmlInforme(html);
+        // Miniaturas de a una (ver crearMiniatura): evita juntar todas las fotos grandes en memoria.
+        const fotos = informe.tableros.flatMap(t => (t.registros || []).map(r => r.foto)).filter(Boolean);
+        setProgreso({ hechas: 0, total: fotos.length });
+        const minis = new Map();
+        for (let i = 0; i < fotos.length; i++) {
+          if (cancelado) return;
+          minis.set(fotos[i], await crearMiniatura(fotos[i]));
+          setProgreso({ hechas: i + 1, total: fotos.length });
+        }
+        if (cancelado) return;
+        setHtmlInforme(generarHTMLInforme(informe, config, { fotoSrc: (foto) => minis.get(foto) }));
       } catch (e) {
-        setError(true);
+        if (!cancelado) setError(true);
       }
-    }, 30);
-    return () => clearTimeout(t);
+    })();
+    return () => { cancelado = true; };
   }, [informe, config]);
 
   const listo = !!htmlInforme;
@@ -466,7 +511,9 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
         </div>
       ) : !listo ? (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ fontSize: 13, color: "#888" }}>Generando vista previa…</div>
+          <div style={{ fontSize: 13, color: "#888" }}>
+            Generando vista previa…{progreso.total > 0 ? ` (${progreso.hechas} de ${progreso.total} fotos)` : ""}
+          </div>
         </div>
       ) : (
         <iframe title="Vista previa del informe" srcDoc={htmlInforme} style={{ flex: 1, width: "100%", border: "none", background: "white" }} />
@@ -733,7 +780,8 @@ export default function App() {
     }
   }
 
-  function generarHTMLInforme(inf, cfg) {
+  // opciones.fotoSrc(foto): permite a la vista previa usar miniaturas en vez de la foto original.
+  function generarHTMLInforme(inf, cfg, opciones = {}) {
     const fechaFmt = new Date(inf.fecha + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
     const totalRegistros = inf.tableros.reduce((s,t) => s + (t.registros?.length||0), 0);
     const criticas = inf.tableros.reduce((s,t) => s + (t.registros||[]).reduce((s2,r) => s2 + r.observaciones.filter(o=>o.criticidad==="Crítica").length, 0), 0);
@@ -782,7 +830,7 @@ export default function App() {
           : '';
         return `<div style="border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px;overflow:hidden;">
           <div style="background:#3a3a3a;color:white;padding:6px 12px;font-size:11px;font-weight:700;">Registro N° ${ri+1}</div>
-          ${reg.foto ? `<img src="${reg.foto.data}" style="width:100%;max-height:420px;object-fit:contain;display:block;background:#f0f0f0;" />` : '<div style="height:160px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:#f7f7f7;">Sin fotografía</div>'}
+          ${reg.foto ? `<img src="${(opciones.fotoSrc && opciones.fotoSrc(reg.foto)) || reg.foto.data}" loading="lazy" decoding="async" style="width:100%;max-height:420px;object-fit:contain;display:block;background:#f0f0f0;" />` : '<div style="height:160px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:#f7f7f7;">Sin fotografía</div>'}
           ${obsHTML || sinObsHTML || cambioHTML ? `<div style="padding:12px 14px;">
             ${obsHTML}
             ${sinObsHTML}
