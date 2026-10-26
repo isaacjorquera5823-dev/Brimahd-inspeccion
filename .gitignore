@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build de TypeScript (se regenera solo)
+*.tsbuildinfo
+
+# Propuestas comerciales y documentos internos: el repo es publico, nunca subirlos
+propuesta/
