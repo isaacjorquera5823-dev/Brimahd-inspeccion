@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, runTransaction } from "firebase/firestore";
+import { getFirestore, doc, getDoc, runTransaction } from "firebase/firestore";
 import { PRIMARY, ACCENT, BG, FONT, CRITICIDAD, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER } from "./theme";
 import { generarPDFInforme } from "./pdfInforme";
 
@@ -327,71 +327,6 @@ async function reserveNextNumber() {
   return `INF-${String(valorReservado).padStart(4, "0")}`;
 }
 
-// ===== Maestro compartido de observaciones (Firebase Firestore) =====
-// Documento: colección "config", documento "observacionesMaestro".
-// Campos: { aprobadas: [{id,texto,criticidad}], pendientes: [{id,texto,criticidad}] }
-// "aprobadas" se suma a OBSERVACIONES_PREDEFINIDAS en el buscador de todos los
-// técnicos. "pendientes" son observaciones agregadas manualmente que un
-// moderador todavía no revisó -- no se muestran a nadie hasta aprobarse.
-const obsMaestroRef = doc(db, "config", "observacionesMaestro");
-
-// Documento: colección "config", documento "moderacion". Campo: { pin }.
-// Si no existe (primera vez que alguien intenta moderar), se crea con un PIN
-// inicial -- después se puede cambiar directo desde la consola de Firebase.
-const moderacionRef = doc(db, "config", "moderacion");
-const PIN_INICIAL_MODERACION = "0000";
-
-async function cargarObsMaestro() {
-  try {
-    const snap = await getDoc(obsMaestroRef);
-    if (!snap.exists()) return { aprobadas: [], pendientes: [] };
-    const data = snap.data();
-    return { aprobadas: data.aprobadas || [], pendientes: data.pendientes || [] };
-  } catch {
-    return { aprobadas: [], pendientes: [] };
-  }
-}
-
-// Manda una observación nueva a "pendientes" para revisión. Falla en
-// silencio si no hay conexión -- la observación ya quedó guardada en el
-// informe del técnico de todas formas, solo no alcanza a compartirse.
-async function enviarObservacionPendiente(item) {
-  try {
-    await setDoc(obsMaestroRef, { pendientes: arrayUnion(item) }, { merge: true });
-  } catch {
-    // sin conexión u otro error: no bloquea el flujo del informe
-  }
-}
-
-async function verificarPinModeracion(pinIngresado) {
-  const snap = await getDoc(moderacionRef);
-  if (!snap.exists()) {
-    // primera vez: crea el documento con el PIN inicial
-    await setDoc(moderacionRef, { pin: PIN_INICIAL_MODERACION });
-    return pinIngresado === PIN_INICIAL_MODERACION;
-  }
-  return pinIngresado === snap.data().pin;
-}
-
-async function aprobarObservacion(item, aprobadasActuales, pendientesActuales) {
-  const nuevasAprobadas = [...aprobadasActuales, item];
-  const nuevasPendientes = pendientesActuales.filter(p => p.id !== item.id);
-  await updateDoc(obsMaestroRef, { aprobadas: nuevasAprobadas, pendientes: nuevasPendientes });
-  return { aprobadas: nuevasAprobadas, pendientes: nuevasPendientes };
-}
-
-async function rechazarObservacion(item, aprobadasActuales, pendientesActuales) {
-  const nuevasPendientes = pendientesActuales.filter(p => p.id !== item.id);
-  await updateDoc(obsMaestroRef, { pendientes: nuevasPendientes });
-  return { aprobadas: aprobadasActuales, pendientes: nuevasPendientes };
-}
-
-async function eliminarObservacionAprobada(item, aprobadasActuales, pendientesActuales) {
-  const nuevasAprobadas = aprobadasActuales.filter(a => a.id !== item.id);
-  await updateDoc(obsMaestroRef, { aprobadas: nuevasAprobadas });
-  return { aprobadas: nuevasAprobadas, pendientes: pendientesActuales };
-}
-
 function Logo({ size = 36, withText = true }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -544,12 +479,6 @@ export default function App() {
   const [autoguardadoError, setAutoguardadoError] = useState(false);
   const draftTimer = useRef(null);
 
-  const [obsMaestro, setObsMaestro] = useState({ aprobadas: [], pendientes: [] });
-  const [pinModeracion, setPinModeracion] = useState("");
-  const [modDesbloqueada, setModDesbloqueada] = useState(false);
-  const [modError, setModError] = useState("");
-  const [modCargando, setModCargando] = useState(false);
-
   useEffect(() => {
     peekNextNumber().then(setProximoNumero).catch(() => setProximoNumero("Sin conexión"));
   }, [screen]);
@@ -558,10 +487,6 @@ export default function App() {
     checkLicencia().then(r =>
       setLicencia({ estado: r.activa ? "activa" : "inactiva", mensaje: r.mensaje })
     );
-  }, []);
-
-  useEffect(() => {
-    cargarObsMaestro().then(setObsMaestro);
   }, []);
 
   // Al abrir la app, revisa si quedó un borrador guardado de una sesión
@@ -1228,105 +1153,7 @@ ${criticasRows.length > 0 ? `
           <textarea style={s.textarea} value={config.epp} onChange={e => setConfig({ ...config, epp: e.target.value })} />
           <button style={{ ...s.btn, ...s.btnPrimary, width: "100%" }} onClick={() => setScreen("inicio")}>Guardar</button>
         </div>
-        <div style={s.card}>
-          <div style={s.sectionTitle}>Observaciones</div>
-          <button style={{ ...s.btnGhost, width: "100%" }} onClick={() => { setModDesbloqueada(false); setPinModeracion(""); setModError(""); setScreen("moderacion"); }}>
-            🔒 Moderar observaciones{obsMaestro.pendientes.length > 0 ? ` (${obsMaestro.pendientes.length} pendiente${obsMaestro.pendientes.length === 1 ? "" : "s"})` : ""}
-          </button>
-        </div>
       </div>
-    </div>
-  );
-
-  if (screen === "moderacion") return (
-    <div style={s.app}>
-      <div style={s.header}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "white", fontFamily: FONT }}>Brimahd ltda.</span>
-        <button style={{ ...s.btn, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 12, padding: "6px 12px" }} onClick={() => setScreen("config")}>← Volver</button>
-      </div>
-      <div style={{ background: ACCENT, padding: "10px 18px" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>🔒 Moderar observaciones</span>
-      </div>
-      {!modDesbloqueada ? (
-        <div style={s.body}>
-          <div style={s.card}>
-            <div style={s.sectionTitle}>Ingresa el PIN</div>
-            <input
-              style={s.input}
-              type="password"
-              inputMode="numeric"
-              value={pinModeracion}
-              onChange={e => setPinModeracion(e.target.value)}
-              placeholder="PIN"
-            />
-            {modError && <div style={{ fontSize: 12, color: "#c0392b", marginBottom: 10 }}>{modError}</div>}
-            <button
-              style={{ ...s.btn, ...s.btnPrimary, width: "100%" }}
-              disabled={modCargando}
-              onClick={async () => {
-                setModCargando(true);
-                setModError("");
-                try {
-                  const ok = await verificarPinModeracion(pinModeracion.trim());
-                  if (ok) setModDesbloqueada(true);
-                  else setModError("PIN incorrecto");
-                } catch {
-                  setModError("No se pudo verificar el PIN. Revisa tu conexión.");
-                } finally {
-                  setModCargando(false);
-                }
-              }}>
-              {modCargando ? "Verificando…" : "Entrar"}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div style={s.body}>
-          <div style={s.card}>
-            <div style={s.sectionTitle}>Pendientes ({obsMaestro.pendientes.length})</div>
-            {obsMaestro.pendientes.length === 0 && (
-              <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", padding: "8px 0" }}>Sin observaciones pendientes</div>
-            )}
-            {obsMaestro.pendientes.map(item => (
-              <div key={item.id} style={{ padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <span style={{ flex: 1, fontSize: 13, color: PRIMARY, lineHeight: 1.4 }}>{item.texto}</span>
-                  <span style={s.badge(item.criticidad)}>{item.criticidad}</span>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "6px 12px", flex: 1 }}
-                    onClick={async () => setObsMaestro(await aprobarObservacion(item, obsMaestro.aprobadas, obsMaestro.pendientes))}>
-                    ✓ Aprobar
-                  </button>
-                  <button style={{ ...s.btnDanger, flex: 1 }}
-                    onClick={async () => setObsMaestro(await rechazarObservacion(item, obsMaestro.aprobadas, obsMaestro.pendientes))}>
-                    ✕ Rechazar
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={s.card}>
-            <div style={s.sectionTitle}>Aprobadas ({obsMaestro.aprobadas.length})</div>
-            {obsMaestro.aprobadas.length === 0 && (
-              <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", padding: "8px 0" }}>Sin observaciones aprobadas todavía</div>
-            )}
-            {obsMaestro.aprobadas.map(item => (
-              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
-                <span style={{ flex: 1, fontSize: 13, color: PRIMARY, lineHeight: 1.4 }}>{item.texto}</span>
-                <span style={s.badge(item.criticidad)}>{item.criticidad}</span>
-                <button style={s.btnDanger}
-                  onClick={async () => {
-                    if (!confirm("¿Eliminar esta observación del maestro? No afecta informes ya generados.")) return;
-                    setObsMaestro(await eliminarObservacionAprobada(item, obsMaestro.aprobadas, obsMaestro.pendientes));
-                  }}>
-                  🗑
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -1447,10 +1274,7 @@ ${criticasRows.length > 0 ? `
   if (obsPicker !== null) {
     const regIdx = obsPicker.regIdx;
     const regSearch = obsSearch[regIdx] || "";
-    // Lista fija + las observaciones que otros técnicos agregaron y ya fueron
-    // aprobadas en la moderación (compartidas vía Firestore).
-    const obsCombinadas = [...OBSERVACIONES_PREDEFINIDAS, ...obsMaestro.aprobadas];
-    const regFiltered = obsCombinadas.filter(o =>
+    const regFiltered = OBSERVACIONES_PREDEFINIDAS.filter(o =>
       o.texto.toLowerCase().includes(regSearch.toLowerCase())
     );
     const reg = tableroEdit.registros[regIdx];
@@ -1510,19 +1334,8 @@ ${criticasRows.length > 0 ? `
               onClick={() => {
                 const texto = (obsLibreTexto[regIdx] || "").trim();
                 if (!texto) return;
-                const criticidad = obsLibreCrit[regIdx] || "Media";
-                addObsToRegistro(regIdx, { texto, criticidad, libre: true });
+                addObsToRegistro(regIdx, { texto, criticidad: obsLibreCrit[regIdx] || "Media", libre: true });
                 setObsLibreTexto(p => { const a = [...p]; a[regIdx] = ""; return a; });
-                // Si no está ya en la lista fija ni en las aprobadas/pendientes
-                // del maestro compartido, la manda a moderación para que otros
-                // técnicos puedan verla en futuros informes una vez aprobada.
-                const yaExiste = obsCombinadas.some(o => o.texto.toLowerCase() === texto.toLowerCase())
-                  || obsMaestro.pendientes.some(o => o.texto.toLowerCase() === texto.toLowerCase());
-                if (!yaExiste) {
-                  const nuevoItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, texto, criticidad };
-                  setObsMaestro(p => ({ ...p, pendientes: [...p.pendientes, nuevoItem] }));
-                  enviarObservacionPendiente(nuevoItem);
-                }
               }}>
               + Agregar observación
             </button>
