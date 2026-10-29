@@ -1,6 +1,6 @@
 # APP BRIMAHD — CONTEXTO DEL PROYECTO
 
-_Última actualización: agosto 2026_
+_Última actualización: octubre 2026_
 
 Este archivo se lee automáticamente al iniciar Claude Code en esta carpeta. Contiene el historial de decisiones, arquitectura y errores ya resueltos — no los repitas.
 
@@ -67,13 +67,13 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 | **QAS** | https://isaacjorquera5823-dev.github.io/brimahd-qas/ | Repo separado `brimahd-qas` (carpeta local `otros/brimahd-qas`), solo contiene el workflow + archivo `RAMA`. El workflow hace checkout de `Brimahd-inspeccion` en la rama que diga `RAMA`, build con `vite build --mode qas --base /brimahd-qas/` y publica en Pages. Se dispara al pushear al repo QAS, o a mano (Actions → Publicar QAS → Run workflow) para traer commits nuevos de la misma rama — **un push a la rama de la app NO actualiza QAS solo**. |
 | **PRD** | https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/ | Push a `main` del repo app (`.github/workflows/deploy.yml`). Requiere confirmación explícita de Isaac. |
 
-- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026): las ramas se prueban ahí antes de PRD, y la combinación de ramas se prueba ahí antes de fusionar. Octubre 2026: `RAMA` = `test-pdf`, entregado a Emanuel para probar.
+- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026): las ramas se prueban ahí antes de PRD, y la combinación de ramas se prueba ahí antes de fusionar. Desde el 27-oct-2026: `RAMA` = `main` (QAS replica PRD con modo prueba). Decisión de Isaac: el maestro de observaciones no se muestra en QAS (no está cotizado y escribe en el Firestore real); queda solo en la rama `test-pdf`.
 - **Modo prueba** (`MODO_PRUEBA` en `App.jsx` = `import.meta.env.DEV || MODE === "qas"`), activo en DEV y QAS, nunca en PRD (el build normal lo elimina; verificado buscando "Modo prueba" en `dist/`):
   - `reserveNextNumber()` no consume el contador: devuelve `PRUEBA-XXXX` con el próximo número solo mirado. Aviso amarillo "Modo prueba" en Inicio.
   - Almacenamiento con sufijo `_qas` (`brimahd_db_qas`, `brimahd_config_qas`): QAS y PRD comparten dominio (`isaacjorquera5823-dev.github.io`) y por lo tanto IndexedDB/localStorage — sin el sufijo, probar en QAS podía pisar un borrador real a medio llenar en PRD.
   - El workflow de QAS se niega a publicar si el build no contiene `brimahd_db_qas` (seguro contra gastar números reales).
-  - Existe completo (DEV+QAS, contador + almacenamiento separado) en `test-pdf` y en `diseno-visual`; en esta última también la preferencia de tema (`brimahd_tema_oscuro_qas`). Al unificar las ramas, conservar los tres sufijos.
-- ⚠️ **Firestore es uno solo para todos los ambientes.** El modo prueba protege el contador, pero el maestro de observaciones (`config/observacionesMaestro`) sí escribe en datos reales desde QAS, y "Enviar informe" manda correos/WhatsApp reales. Mejora futura: proyecto Firebase separado para QAS.
+  - Existe completo (DEV+QAS, contador + almacenamiento separado) en `main`, `test-pdf` y `diseno-visual`; en esta última también la preferencia de tema (`brimahd_tema_oscuro_qas`). Al unificar las ramas, conservar los tres sufijos.
+- ⚠️ **Firestore es uno solo para todos los ambientes.** El modo prueba protege el contador, pero el maestro de observaciones (`config/observacionesMaestro`, solo en `test-pdf`) escribiría en datos reales si QAS apuntara a esa rama, y "Enviar informe" manda correos/WhatsApp reales. Mejora futura: proyecto Firebase separado para QAS.
 - El repo app vive dentro de OneDrive: `npm install` reescribe miles de archivos en `node_modules` y OneDrive pide confirmar "eliminar N elementos" — es seguro eliminarlos (son regenerables). A futuro conviene mover los repos fuera de OneDrive.
 
 ## Stack
