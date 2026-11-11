@@ -65,7 +65,7 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 | Ambiente | Dónde | Cómo se publica |
 |---|---|---|
 | **DEV** | `npm run dev` en el PC, opcionalmente expuesto al celular con `cloudflared tunnel --url http://localhost:PUERTO` (exe en `%LOCALAPPDATA%\Programs\cloudflared\`). URL `*.trycloudflare.com` aleatoria y temporal: muere al cerrar el PC/la sesión. **No dársela a terceros.** | — |
-| **QAS** | https://isaacjorquera5823-dev.github.io/brimahd-qas/ | Repo separado `brimahd-qas` (carpeta local `otros/brimahd-qas`) con solo el workflow + archivo `RAMA`. El workflow hace checkout de `Brimahd-inspeccion` en la rama de `RAMA`, build con `vite build --mode qas --base /brimahd-qas/` y publica en Pages. Se dispara al pushear al repo QAS o a mano (Actions → Publicar QAS → Run workflow) — **un push a la rama de la app NO actualiza QAS solo**. |
+| **QAS** | https://isaacjorquera5823-dev.github.io/brimahd-qas/ | Repo separado `brimahd-qas` (carpeta local `app-mantencion/brimahd-qas`) con solo el workflow + archivo `RAMA`. El workflow hace checkout de `Brimahd-inspeccion` en la rama de `RAMA`, build con `vite build --mode qas --base /brimahd-qas/` y publica en Pages. Se dispara al pushear al repo QAS o a mano (Actions → Publicar QAS → Run workflow) — **un push a la rama de la app NO actualiza QAS solo**. |
 | **PRD** | https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/ | Push a `main` del repo app. Requiere confirmación explícita de Isaac. |
 
 - **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026). Octubre 2026: `RAMA` = `test-pdf`, entregado a Emanuel. No cambiar a `diseno-visual` mientras Emanuel esté probando el PDF, y avisarle cuando cambie.
