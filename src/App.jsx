@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, runTransaction } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { PRIMARY, ACCENT, BG, FONT, CRITICIDAD, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER } from "./theme";
 import { generarPDFInforme } from "./pdfInforme";
 
@@ -325,6 +325,30 @@ async function reserveNextNumber() {
     return actual;
   });
   return `INF-${String(valorReservado).padStart(4, "0")}`;
+}
+
+// ===== Historial de informes emitidos (Firebase Firestore) =====
+// Colección "historialInformes", un documento por informe, con el número como
+// id (ej. "INF-0121"). Antes solo existía el contador y no quedaba registro de
+// cuándo se emitió cada número.
+// Es "mejor esfuerzo": si falla (sin internet, o reglas de Firebase que aún no
+// permiten escribir en esta colección) NO bloquea al técnico, solo deja un aviso
+// en la consola. Nunca se escribe en modo prueba, porque Firestore es uno solo
+// para DEV, QAS y PRD.
+function registrarInformeEmitido(numero, inf) {
+  if (MODO_PRUEBA) return;
+  const datos = {
+    numero,
+    emitidoEn: serverTimestamp(),          // fecha/hora según el servidor de Firebase (confiable)
+    emitidoEnCelular: new Date().toISOString(), // respaldo: fecha/hora del celular
+    fechaInforme: inf.fecha || "",          // la fecha que el técnico puso en el informe
+    cliente: inf.cliente || "",
+    personal: (inf.personal || []).filter(p => p && p.trim()),
+    cantidadTableros: inf.tableros?.length || 0,
+  };
+  setDoc(doc(db, "historialInformes", numero), datos).catch(e => {
+    console.warn("No se pudo guardar el informe en el historial:", e);
+  });
 }
 
 function Logo({ size = 36, withText = true }) {
@@ -696,6 +720,7 @@ export default function App() {
     setGenerando(true);
     try {
       const numeroFinal = await reserveNextNumber();
+      registrarInformeEmitido(numeroFinal, informe); // no se espera: nunca frena al técnico
       setInforme(p => ({ ...p, numero: numeroFinal }));
       setScreen("preview");
     } catch (e) {
