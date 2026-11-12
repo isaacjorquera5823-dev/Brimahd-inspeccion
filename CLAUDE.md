@@ -67,13 +67,13 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 | **QAS** | https://isaacjorquera5823-dev.github.io/brimahd-qas/ | Repo separado `brimahd-qas` (carpeta local `app-mantencion/brimahd-qas`), solo contiene el workflow + archivo `RAMA`. El workflow hace checkout de `Brimahd-inspeccion` en la rama que diga `RAMA`, build con `vite build --mode qas --base /brimahd-qas/` y publica en Pages. Se dispara al pushear al repo QAS, o a mano (Actions → Publicar QAS → Run workflow) para traer commits nuevos de la misma rama — **un push a la rama de la app NO actualiza QAS solo**. |
 | **PRD** | https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/ | Push a `main` del repo app (`.github/workflows/deploy.yml`). Requiere confirmación explícita de Isaac. |
 
-- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026): las ramas se prueban ahí antes de PRD, y la combinación de ramas se prueba ahí antes de fusionar. Desde el 27-oct-2026: `RAMA` = `main` (QAS replica PRD con modo prueba). Decisión de Isaac: el maestro de observaciones no se muestra en QAS (no está cotizado y escribe en el Firestore real); queda solo en la rama `test-pdf`.
+- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026): las ramas se prueban ahí antes de PRD, y la combinación de ramas se prueba ahí antes de fusionar. Desde el 27-oct-2026: `RAMA` = `main` (QAS replica PRD con modo prueba). Decisión de Isaac: el maestro de observaciones no se muestra en QAS (no está cotizado y escribe en el Firestore real); queda solo en la rama `maestro-observaciones`.
 - **Modo prueba** (`MODO_PRUEBA` en `App.jsx` = `import.meta.env.DEV || MODE === "qas"`), activo en DEV y QAS, nunca en PRD (el build normal lo elimina; verificado buscando "Modo prueba" en `dist/`):
   - `reserveNextNumber()` no consume el contador: devuelve `PRUEBA-XXXX` con el próximo número solo mirado. Aviso amarillo "Modo prueba" en Inicio.
   - Almacenamiento con sufijo `_qas` (`brimahd_db_qas`, `brimahd_config_qas`): QAS y PRD comparten dominio (`isaacjorquera5823-dev.github.io`) y por lo tanto IndexedDB/localStorage — sin el sufijo, probar en QAS podía pisar un borrador real a medio llenar en PRD.
   - El workflow de QAS se niega a publicar si el build no contiene `brimahd_db_qas` (seguro contra gastar números reales).
-  - Existe completo (DEV+QAS, contador + almacenamiento separado) en `main`, `test-pdf` y `diseno-visual`; en esta última también la preferencia de tema (`brimahd_tema_oscuro_qas`). Al unificar las ramas, conservar los tres sufijos.
-- ⚠️ **Firestore es uno solo para todos los ambientes.** El modo prueba protege el contador, pero el maestro de observaciones (`config/observacionesMaestro`, solo en `test-pdf`) escribiría en datos reales si QAS apuntara a esa rama, y "Enviar informe" manda correos/WhatsApp reales. Mejora futura: proyecto Firebase separado para QAS.
+  - Existe completo (DEV+QAS, contador + almacenamiento separado) en `main`, `maestro-observaciones` y `diseno-visual`; en esta última también la preferencia de tema (`brimahd_tema_oscuro_qas`). Al unificar las ramas, conservar los tres sufijos.
+- ⚠️ **Firestore es uno solo para todos los ambientes.** El modo prueba protege el contador, pero el maestro de observaciones (`config/observacionesMaestro`, solo en `maestro-observaciones`) escribiría en datos reales si QAS apuntara a esa rama, y "Enviar informe" manda correos/WhatsApp reales. Mejora futura: proyecto Firebase separado para QAS.
 - El repo app vive dentro de OneDrive: `npm install` reescribe miles de archivos en `node_modules` y OneDrive pide confirmar "eliminar N elementos" — es seguro eliminarlos (son regenerables). A futuro conviene mover los repos fuera de OneDrive.
 
 ## Stack
@@ -117,16 +117,17 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 - **Para traer el código fuente actual**: `curl -s "https://raw.githubusercontent.com/isaacjorquera5823-dev/Brimahd-inspeccion/main/src/App.jsx"` — la API de GitHub para listar directorios tiene rate limit agresivo, evitarla.
 
 ## Informe en PDF y envío (en PRD desde oct 2026)
-Llegó a `main` desde la rama `pdf-prd`: `test-pdf` **sin** el maestro de observaciones.
+Llegó a `main` desde la rama `pdf-prd` (ya borrada): el contenido de `test-pdf` (hoy `maestro-observaciones`) **sin** el maestro de observaciones.
 
 - **Informe en PDF** (en PRD desde la fusión de `pdf-prd`, oct 2026): módulo nuevo `src/pdfInforme.js` + `src/theme.js` (paleta extraída) + dependencia `jspdf`. `generarPDFInforme()` dibuja el PDF a mano con las primitivas de jsPDF (texto, rectángulos, `addImage`) en vez de convertir el HTML con html2canvas, para no rasterizar fotos grandes en memoria. Cuida la paginación para que el header de un tablero nunca quede solo en una página sin al menos su primer registro — corregido también para el título "Detalle por Tablero" (`dibujarTituloSeccion` acepta `siguienteMinH` y reserva ese bloque junto con el título; `medirLookaheadTablero` calcula cuánto mide el header+primer registro del tablero que sigue).
 - **Botón único "Enviar informe"**: reemplaza los antiguos "⬇ Descargar informe" + "📤 Enviar" separados. Intenta primero el panel nativo de compartir (PDF adjunto + asunto/cuerpo del correo prearmados) en cualquier plataforma que lo soporte; si no, cae a descarga directa + enlaces de WhatsApp/Email sin adjunto. El asunto del correo (`construirEmailInforme` → `asunto`) es el mismo nombre que el archivo PDF (`nombreBaseInforme(inf)`: `{numero} - {cliente} - {fechaYYYYMMDD}`), sin extensión.
 - **Autoguardado ajustado a 1500ms** (antes 500ms): con 500ms, el guardado en IndexedDB (que clona el informe completo, incluidas todas las fotos ya tomadas) se disparaba justo al pasar de un campo a otro durante el llenado, sintiéndose como lag. Con más margen ya no coincide con el ritmo normal de tipeo. Si en informes grandes (muchos tableros con fotos) sigue notándose lento, la mejora pendiente es separar el autoguardado en partes (no re-clonar tableros ya confirmados que no cambiaron) — cambio más grande a una función de la que depende no perder trabajo ante un crash, evaluarlo con cuidado antes de tocarlo.
 - Aprendizajes del PDF: `navigator.share()` no permite dar un texto distinto según qué app elija el usuario (Mail, WhatsApp, etc. reciben el mismo `title`/`text`); jsPDF trae `html2canvas` como dependencia opcional (aparece como chunk en `vite build` aunque nunca se usa, no es un problema real, solo puede confundir al revisar el build).
 
-## 🧪 Solo en la rama `test-pdf` (NO en PRD)
+## 🧪 Solo en la rama `maestro-observaciones` (NO en PRD)
+_Se llamaba `test-pdf` hasta el 12-nov-2026; se renombró porque su único contenido propio es el maestro de observaciones (el PDF ya está en `main`)._
 - **Maestro compartido de observaciones con moderación** (experimental): dos documentos nuevos en Firestore, `config/observacionesMaestro` (`{aprobadas, pendientes}`) y `config/moderacion` (`{pin}`, PIN inicial `0000`, candado simple sin seguridad real). Si un técnico agrega una observación que no está en la lista fija, queda en `pendientes` hasta que alguien la apruebe desde una pantalla nueva protegida por PIN.
-  - ⚠️ **Importante**: Firestore es el mismo proyecto de producción (`brimahd-inspeccion`) para todas las ramas — no hay un Firestore separado para pruebas. Probar esta función desde `test-pdf` ya crea/modifica esos documentos en el Firestore real. Antes de fusionar, revisar las reglas de seguridad en la consola de Firebase para que la escritura a estos dos documentos nuevos quede correctamente restringida.
+  - ⚠️ **Importante**: Firestore es el mismo proyecto de producción (`brimahd-inspeccion`) para todas las ramas — no hay un Firestore separado para pruebas. Probar esta función desde `maestro-observaciones` ya crea/modifica esos documentos en el Firestore real. Antes de fusionar, revisar las reglas de seguridad en la consola de Firebase para que la escritura a estos dos documentos nuevos quede correctamente restringida.
 
 ## Flujo de trabajo de Isaac
 - Prefiere entender el porqué de cada decisión, no solo aceptar sugerencias — corrige el enfoque activamente.
@@ -136,7 +137,7 @@ Llegó a `main` desde la rama `pdf-prd`: `test-pdf` **sin** el maestro de observ
 
 ## Pendiente
 - Historial de informes en Firestore (ya está la infraestructura, falta extenderla más allá del contador)
-- Maestro compartido de observaciones (solo en `test-pdf`): revisar reglas de Firebase antes de llevarlo a PRD.
+- Maestro compartido de observaciones (solo en `maestro-observaciones`): revisar reglas de Firebase antes de llevarlo a PRD.
 - Rediseño visual (íconos de línea, pantalla de Bienvenida, modo oscuro con toggle, stepper de 2 pasos, hojas inferiores): **ya implementado en la rama `diseno-visual`**. Decisión de Isaac (26-oct-2026): es una mejora para el futuro, no va a PRD por ahora. Ver el CLAUDE.md de esa rama para el detalle.
 - Al retomar el rediseño: traer `main` a `diseno-visual` (ya tiene PDF + miniaturas). Los dos `src/theme.js` chocan: unificarlos cuidando que el PDF mantenga colores fijos y no siga el modo oscuro.
 - `npm run build` (que corre `tsc -b`) falla por `src/main.tsx` importando `./index.css` sin declaración de tipos — preexistente, no afecta el deploy (que usa `npx vite build` directo).
