@@ -1,6 +1,6 @@
 # APP BRIMAHD — CONTEXTO DEL PROYECTO
 
-_Última actualización: octubre 2026_
+_Última actualización: noviembre 2026_
 
 Este archivo se lee automáticamente al iniciar Claude Code en esta carpeta. Contiene el historial de decisiones, arquitectura y errores ya resueltos — no los repitas.
 
@@ -85,7 +85,12 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 ## Firebase / Firestore
 - `contadores/informes` → numeración correlativa (INF-XXXX), reservada de forma **atómica** vía transacción para evitar duplicados entre técnicos en paralelo
 - `config/licencia` → campo `activa` (boolean) = **kill switch remoto de licencia**. Si `false`, la app muestra pantalla "Servicio suspendido" y bloquea el uso. Si el documento no existe, la app **falla en modo abierto** (carga normal) para evitar auto-bloqueo por mala configuración.
-- Reglas de seguridad: solo esos documentos son de lectura/escritura pública, el resto bloqueado.
+- `historialInformes/{numero}` → **historial de informes emitidos** (en PRD desde el 12-nov-2026). Un documento por informe, id = número (`INF-0121`…), creado por `registrarInformeEmitido()` en `App.jsx` justo después de reservar el número en `generarInforme()`. Campos: `numero`, `emitidoEn` (serverTimestamp, el confiable), `emitidoEnCelular` (ISO del celular, respaldo), `fechaInforme`, `cliente`, `personal`, `cantidadTableros`.
+  - **Mejor esfuerzo**: no se espera (`setDoc(...).catch(console.warn)`), si falla nunca frena al técnico. No se escribe en `MODO_PRUEBA` (DEV/QAS), porque Firestore es uno solo.
+  - Registra el momento de **reservar el número** ("Generar informe"), no el de enviar el PDF. Un número reservado y nunca enviado igual queda registrado.
+  - Los informes INF-0001 a INF-0120 (1-jul al 11-nov-2026) **no tienen fecha individual**: antes solo existía el contador. Lo único conocido es `createTime` (1-jul-2026) y `updateTime` (11-nov-2026) del doc `contadores/informes`, que se leen por la API REST pública de Firestore.
+  - Para ver el historial: consola de Firebase → Firestore Database → Datos (desde fuera está bloqueado para lectura, a propósito).
+- Reglas de seguridad (editadas a mano en la consola de Firebase, no versionadas en el repo): `contadores/informes` lectura/escritura pública; `config/licencia` solo lectura; `config/observacionesMaestro` y `config/moderacion` lectura/escritura (para `test-pdf`); `historialInformes/{numero}` **solo `create`** (sin leer, editar ni borrar, ni siquiera la app); todo lo demás bloqueado (`{document=**}` en false). Las reglas suman permisos: un `match` específico permite aunque el comodín final diga false. Para ver o editar las reglas hay que entrar con la cuenta Google dueña del proyecto: otras cuentas de Isaac no lo ven ("El proyecto no existe o no tienes permiso").
 
 ## Diseño
 - Primario: `#2c2c2c` (gris carbón) · Acento: `#e8b923` (dorado) · Garantía: `#6b4fa0` (morado) · Fondo: `#f8f8f8` · Tipografía declarada como `'Roboto', sans-serif` pero sin webfont cargado (no hay `<link>` ni `@font-face` en `index.html`) — en la práctica cae a la fuente del sistema de cada celular
@@ -104,6 +109,7 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 - Compresión de fotos (`comprimirImagen()`): máx 1600px, JPEG calidad 0.72 (~200-400KB c/u), con compresión adaptativa más agresiva sobre los 50/100/200 fotos (`parametrosCompresion()`)
 - Autosave en IndexedDB incluye `tableroEdit`, `editIdx` y `screen` actual — el tablero en edición sobrevive a un crash
 - Kill switch de licencia (ver Firebase arriba)
+- Historial de informes emitidos en Firestore (`historialInformes`, ver Firebase arriba)
 - Manual de uso para técnicos: `manual-brimahd-capturas.html` v2.0, HTML autocontenido con capturas reales en base64, formato de tarjetas en 8 pasos
 
 ## Aprendizajes clave (no repetir estos errores)
@@ -135,7 +141,7 @@ Llegó a `main` desde la rama `pdf-prd`: `test-pdf` **sin** el maestro de observ
 - El argumentario de precios/comercial se mantiene como documento separado de la propuesta que ve el cliente.
 
 ## Pendiente
-- Historial de informes en Firestore (ya está la infraestructura, falta extenderla más allá del contador)
+- Historial de informes: **hecho** (12-nov-2026, ver Firebase arriba). Falta confirmar con el primer informe real (INF-0121) que aparece el documento en `historialInformes`. Posibles mejoras: marcar cuándo se envió el PDF (no solo cuándo se reservó el número), y una pantalla en la app para ver el historial (requeriría permitir lectura en las reglas).
 - Maestro compartido de observaciones (solo en `test-pdf`): revisar reglas de Firebase antes de llevarlo a PRD.
 - Rediseño visual (íconos de línea, pantalla de Bienvenida, modo oscuro con toggle, stepper de 2 pasos, hojas inferiores): **ya implementado en la rama `diseno-visual`**. Decisión de Isaac (26-oct-2026): es una mejora para el futuro, no va a PRD por ahora. Ver el CLAUDE.md de esa rama para el detalle.
 - Al retomar el rediseño: traer `main` a `diseno-visual` (ya tiene PDF + miniaturas). Los dos `src/theme.js` chocan: unificarlos cuidando que el PDF mantenga colores fijos y no siga el modo oscuro.
