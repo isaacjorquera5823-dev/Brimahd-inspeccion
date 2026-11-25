@@ -578,6 +578,102 @@ export function estamparFooters(doc, inf, cfg) {
   }
 }
 
+// ===== Límite de peso del PDF =====
+// DuocUC rechaza correos con adjuntos sobre 20 MB. Además, el correo codifica
+// el adjunto en base64 (un archivo de 15 MB viaja como ~20 MB), así que el
+// PDF se mantiene bajo 14 MB para que pase con margen sin importar cómo mida
+// el servidor de Duoc. Casi todo el peso del PDF son las fotos (jsPDF las
+// inserta tal cual, sin recomprimirlas), así que si la suma de fotos excede
+// el presupuesto se recomprimen SOLO para el PDF — el borrador guardado en el
+// celular queda intacto con las originales.
+// En la hoja cada foto se ve de ~11 x 8,5 cm: con ~1000 px de ancho ya se ve
+// nítida impresa, así que bajar desde 1600 px no se nota en el informe.
+export const PDF_MAX_BYTES = 14 * 1024 * 1024;
+const PDF_RESERVA_TEXTO = 600 * 1024; // portada, tablas, textos y estructura del PDF
+const FOTO_MIN_LADO = 700; // nunca achicar más que esto (se perdería detalle)
+const FOTO_MIN_CALIDAD = 0.45;
+
+function bytesDataUrl(dataUrl) {
+  const coma = dataUrl.indexOf(",");
+  return Math.floor(((dataUrl.length - coma - 1) * 3) / 4);
+}
+
+function todasLasFotos(inf) {
+  const fotos = [];
+  (inf.tableros || []).forEach((t) =>
+    (t.registros || []).forEach((r) => {
+      if (r.foto && r.foto.data) fotos.push(r.foto);
+    }),
+  );
+  return fotos;
+}
+
+// Recomprime una foto hasta que pese como máximo `objetivo` bytes. Trabaja de
+// a una foto y libera el lienzo al terminar (Safari en iPhone retiene la
+// memoria del canvas si no se le pone tamaño 0).
+function recomprimirFoto(dataUrl, objetivo) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const ladoOriginal = Math.max(img.width, img.height);
+      const actual = bytesDataUrl(dataUrl);
+      // El peso de un JPEG crece aprox. con la cantidad de píxeles (lado²).
+      let escala = Math.min(1, Math.sqrt(objetivo / actual) * 1.1);
+      let calidad = 0.7;
+      const canvas = document.createElement("canvas");
+      const c2d = canvas.getContext("2d");
+      let resultado = dataUrl;
+      for (let intento = 0; intento < 6; intento++) {
+        const lado = Math.max(Math.min(FOTO_MIN_LADO, ladoOriginal), Math.round(ladoOriginal * escala));
+        const f = lado / ladoOriginal;
+        canvas.width = Math.round(img.width * f);
+        canvas.height = Math.round(img.height * f);
+        c2d.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const nuevo = canvas.toDataURL("image/jpeg", calidad);
+        if (bytesDataUrl(nuevo) < bytesDataUrl(resultado)) resultado = nuevo;
+        if (bytesDataUrl(resultado) <= objetivo) break;
+        if (lado <= FOTO_MIN_LADO && calidad <= FOTO_MIN_CALIDAD) break;
+        escala *= 0.85;
+        calidad = Math.max(FOTO_MIN_CALIDAD, calidad - 0.08);
+      }
+      canvas.width = canvas.height = 0;
+      img.src = "";
+      resolve(resultado);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+// Devuelve una copia del informe con fotos que, sumadas, caben en
+// `presupuestoFotos`. Si ya caben, devuelve el mismo informe sin tocar nada.
+// A cada foto se le pide bajar en la misma proporción, así las fotos que ya
+// eran livianas no se castigan de más.
+async function ajustarFotosAlPeso(inf, presupuestoFotos) {
+  const fotos = todasLasFotos(inf);
+  const total = fotos.reduce((s, f) => s + bytesDataUrl(f.data), 0);
+  if (total <= presupuestoFotos) return inf;
+
+  const proporcion = presupuestoFotos / total;
+  const reemplazos = new Map();
+  for (let i = 0; i < fotos.length; i++) {
+    const foto = fotos[i];
+    const objetivo = Math.floor(bytesDataUrl(foto.data) * proporcion);
+    reemplazos.set(foto, { ...foto, data: await recomprimirFoto(foto.data, objetivo) });
+    if (i % 5 === 4) await new Promise((r) => setTimeout(r, 0)); // no congelar la pantalla
+  }
+
+  return {
+    ...inf,
+    tableros: inf.tableros.map((t) => ({
+      ...t,
+      registros: (t.registros || []).map((r) =>
+        r.foto && reemplazos.has(r.foto) ? { ...r, foto: reemplazos.get(r.foto) } : r,
+      ),
+    })),
+  };
+}
+
 // ===== Orquestador =====
 // Genera el PDF dibujando directamente con las primitivas de jsPDF (texto,
 // rectángulos, addImage) en vez de rasterizar el HTML completo con
@@ -585,7 +681,21 @@ export function estamparFooters(doc, inf, cfg) {
 // comprimirImagen() en App.jsx, así que aquí solo se insertan, sin volver a
 // procesarlas. Cede el hilo cada 5 tableros para no congelar la UI en
 // informes grandes.
+// Si aun así el PDF quedara sobre el límite (fotos que no se dejan comprimir
+// tanto como se estimó), se vuelve a intentar con un presupuesto menor.
 export async function generarPDFInforme(inf, cfg) {
+  let presupuestoFotos = PDF_MAX_BYTES - PDF_RESERVA_TEXTO;
+  let blob = null;
+  for (let intento = 0; intento < 3; intento++) {
+    const infAjustado = await ajustarFotosAlPeso(inf, presupuestoFotos);
+    blob = await dibujarPDF(infAjustado, cfg);
+    if (blob.size <= PDF_MAX_BYTES) break;
+    presupuestoFotos = Math.floor(presupuestoFotos * (PDF_MAX_BYTES / blob.size) * 0.9);
+  }
+  return blob;
+}
+
+async function dibujarPDF(inf, cfg) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
   doc.setProperties({ title: `${inf.numero || ""} - ${inf.cliente || ""}`, author: cfg.empresa || "" });
