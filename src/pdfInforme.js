@@ -608,6 +608,19 @@ function todasLasFotos(inf) {
   return fotos;
 }
 
+// Peso aproximado que tendrá el PDF antes de generarlo (para avisar en la
+// pantalla mientras se arma). Nunca supera el límite, porque si las fotos
+// suman más, se ajustan hasta quedar bajo él.
+export function estimarPesoPDF(inf) {
+  const fotos = todasLasFotos(inf).reduce((s, f) => s + bytesDataUrl(f.data), 0);
+  return Math.min(fotos + 300 * 1024, PDF_MAX_BYTES);
+}
+
+export function excedeLimiteFotos(inf) {
+  const fotos = todasLasFotos(inf).reduce((s, f) => s + bytesDataUrl(f.data), 0);
+  return fotos > PDF_MAX_BYTES - PDF_RESERVA_TEXTO;
+}
+
 // Recomprime una foto hasta que pese como máximo `objetivo` bytes. Trabaja de
 // a una foto y libera el lienzo al terminar (Safari en iPhone retiene la
 // memoria del canvas si no se le pone tamaño 0).

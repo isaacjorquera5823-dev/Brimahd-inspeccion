@@ -2,7 +2,13 @@ import React, { useState, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { PRIMARY, ACCENT, BG, FONT, CRITICIDAD, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER } from "./theme";
-import { generarPDFInforme } from "./pdfInforme";
+import { generarPDFInforme, estimarPesoPDF, excedeLimiteFotos } from "./pdfInforme";
+
+// "12,4 MB" / "850 KB", con coma decimal como se escribe en Chile.
+function formatearPeso(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
+}
 
 const PISOS = ["Piso -3","Piso -2","Piso -1","Zócalo","Piso 1","Piso 2","Piso 3","Piso 4","Piso 5","Piso 6","Piso 7","Piso 8","Piso 9","Piso 10","Piso 11","Piso 12","Piso 13","Piso 14","Piso 15","Azotea"];
 const UBICACIONES = ["Sala","Pasillo","Shaft","Laboratorio","Cancha","Multicancha","Auditorio","Administración","Coordinación Docente","Coordinación de Carrera","Servicios Digitales","Casino","Sala Eléctrica"];
@@ -400,11 +406,18 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
     navigator.canShare({ files: [new File([""], "test.pdf", { type: "application/pdf" })] })
   );
 
+  // Aviso del peso del PDF: mientras se genera muestra una estimación; al
+  // terminar, el peso real del archivo (límite de adjuntos de Duoc: 20 MB).
+  const [pesoPDF, setPesoPDF] = useState(null); // { bytes, estimado, ajustado }
+
   async function handleEnviar() {
     setGenerandoPDF(true);
+    const ajustado = excedeLimiteFotos(informe);
+    setPesoPDF({ bytes: estimarPesoPDF(informe), estimado: true, ajustado });
     try {
-      await enviarInforme(informe, config);
+      await enviarInforme(informe, config, (bytes) => setPesoPDF({ bytes, estimado: false, ajustado }));
     } catch (e) {
+      setPesoPDF(null);
       alert("No se pudo generar el PDF. Intenta de nuevo.");
     } finally {
       setGenerandoPDF(false);
@@ -457,6 +470,19 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
           <button style={{ ...s.btn, background: "#2e7d32", color: "white", fontSize: 12, padding: "8px 14px" }} onClick={finalizarInforme}>✓ Finalizar</button>
         </div>
       </div>
+      {pesoPDF && (
+        <div style={{
+          background: pesoPDF.estimado ? "#f0f0f0" : "#e8f5e9",
+          color: pesoPDF.estimado ? "#555" : "#2e7d32",
+          padding: "8px 16px", fontSize: 12, lineHeight: 1.4,
+        }}>
+          {pesoPDF.estimado
+            ? (pesoPDF.ajustado
+              ? "Generando PDF… ajustando fotos para que pese menos de 14 MB (límite de Duoc: 20 MB)"
+              : `Generando PDF… peso aproximado ${formatearPeso(pesoPDF.bytes)}`)
+            : `✓ PDF de ${formatearPeso(pesoPDF.bytes)}: bajo el límite de 20 MB de Duoc${pesoPDF.ajustado ? " (fotos ajustadas para el envío)" : ""}`}
+        </div>
+      )}
       {!compartirArchivosDisponible && (
         <div style={{ background: "#fff9ec", borderBottom: "1px solid #ffe082", padding: "8px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "#7c5800" }}>Tu navegador no adjunta el PDF automáticamente. También puedes:</span>
@@ -961,8 +987,11 @@ ${criticasRows.length > 0 ? `
     return `${inf.numero} - ${inf.cliente} - ${fechaStr}`;
   }
 
-  async function enviarInforme(inf, cfg) {
+  // alGenerar(bytes): avisa el peso real del PDF apenas está listo, antes de
+  // abrir el panel de compartir (que puede quedar abierto un buen rato).
+  async function enviarInforme(inf, cfg, alGenerar) {
     const blob = await generarPDFInforme(inf, cfg);
+    if (alGenerar) alGenerar(blob.size);
     const nombreArchivo = `${nombreBaseInforme(inf)}.pdf`;
     const file = new File([blob], nombreArchivo, { type: 'application/pdf' });
 
