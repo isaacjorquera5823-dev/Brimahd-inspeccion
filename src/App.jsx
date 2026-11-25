@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { PRIMARY, ACCENT, BG, FONT, CRITICIDAD, CRITICO_COLOR, CRITICO_BG, CRITICO_BORDER } from "./theme";
-import { generarPDFInforme, estimarPesoPDF, excedeLimiteFotos } from "./pdfInforme";
+import { generarPDFInforme } from "./pdfInforme";
 
 // "12,4 MB" / "850 KB", con coma decimal como se escribe en Chile.
 function formatearPeso(bytes) {
@@ -406,16 +406,15 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
     navigator.canShare({ files: [new File([""], "test.pdf", { type: "application/pdf" })] })
   );
 
-  // Aviso del peso del PDF: mientras se genera muestra una estimación; al
-  // terminar, el peso real del archivo (límite de adjuntos de Duoc: 20 MB).
-  const [pesoPDF, setPesoPDF] = useState(null); // { bytes, estimado, ajustado }
+  // Aviso del peso del PDF: mientras se genera dice "Generando PDF…"; al
+  // terminar, solo el peso real del archivo (Duoc acepta adjuntos de hasta 20 MB).
+  const [pesoPDF, setPesoPDF] = useState(null); // { bytes, estimado }
 
   async function handleEnviar() {
     setGenerandoPDF(true);
-    const ajustado = excedeLimiteFotos(informe);
-    setPesoPDF({ bytes: estimarPesoPDF(informe), estimado: true, ajustado });
+    setPesoPDF({ bytes: 0, estimado: true });
     try {
-      await enviarInforme(informe, config, (bytes) => setPesoPDF({ bytes, estimado: false, ajustado }));
+      await enviarInforme(informe, config, (bytes) => setPesoPDF({ bytes, estimado: false }));
     } catch (e) {
       setPesoPDF(null);
       alert("No se pudo generar el PDF. Intenta de nuevo.");
@@ -476,11 +475,7 @@ function VistaPreviaInforme({ informe, config, setScreen, finalizarInforme, gene
           color: pesoPDF.estimado ? "#555" : "#2e7d32",
           padding: "8px 16px", fontSize: 12, lineHeight: 1.4,
         }}>
-          {pesoPDF.estimado
-            ? (pesoPDF.ajustado
-              ? "Generando PDF… ajustando fotos para que pese menos de 14 MB (límite de Duoc: 20 MB)"
-              : `Generando PDF… peso aproximado ${formatearPeso(pesoPDF.bytes)}`)
-            : `✓ PDF de ${formatearPeso(pesoPDF.bytes)}: bajo el límite de 20 MB de Duoc${pesoPDF.ajustado ? " (fotos ajustadas para el envío)" : ""}`}
+          {pesoPDF.estimado ? "Generando PDF…" : `PDF de ${formatearPeso(pesoPDF.bytes)}`}
         </div>
       )}
       {!compartirArchivosDisponible && (
