@@ -1,6 +1,6 @@
 # APP BRIMAHD — CONTEXTO DEL PROYECTO
 
-_Última actualización: noviembre 2026_
+_Última actualización: 26-nov-2026_
 
 Este archivo se lee automáticamente al iniciar Claude Code en esta carpeta. Contiene el historial de decisiones, arquitectura y errores ya resueltos — no los repitas.
 
@@ -67,13 +67,16 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 | **QAS** | https://isaacjorquera5823-dev.github.io/brimahd-qas/ | Repo separado `brimahd-qas` (carpeta local `otros/brimahd-qas`), solo contiene el workflow + archivo `RAMA`. El workflow hace checkout de `Brimahd-inspeccion` en la rama que diga `RAMA`, build con `vite build --mode qas --base /brimahd-qas/` y publica en Pages. Se dispara al pushear al repo QAS, o a mano (Actions → Publicar QAS → Run workflow) para traer commits nuevos de la misma rama — **un push a la rama de la app NO actualiza QAS solo**. |
 | **PRD** | https://isaacjorquera5823-dev.github.io/Brimahd-inspeccion/ | Push a `main` del repo app (`.github/workflows/deploy.yml`). Requiere confirmación explícita de Isaac. |
 
-- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026): las ramas se prueban ahí antes de PRD, y la combinación de ramas se prueba ahí antes de fusionar. Desde el 27-oct-2026: `RAMA` = `main` (QAS replica PRD con modo prueba). Decisión de Isaac: el maestro de observaciones no se muestra en QAS (no está cotizado y escribe en el Firestore real); queda solo en la rama `maestro-observaciones`.
+- **Un solo QAS, no uno por rama** (decisión con Isaac, oct 2026): las ramas se prueban ahí antes de PRD, y la combinación de ramas se prueba ahí antes de fusionar. Normalmente `RAMA` = `main` (QAS replica PRD con modo prueba); se cambia a una rama solo mientras se prueba y se devuelve a `main` al pasarla a PRD (último uso: `pdf-limite-peso`, 25/26-nov-2026). Decisión de Isaac: el maestro de observaciones no se muestra en QAS (no está cotizado y escribe en el Firestore real); queda solo en la rama `maestro-observaciones`.
 - **Modo prueba** (`MODO_PRUEBA` en `App.jsx` = `import.meta.env.DEV || MODE === "qas"`), activo en DEV y QAS, nunca en PRD (el build normal lo elimina; verificado buscando "Modo prueba" en `dist/`):
   - `reserveNextNumber()` no consume el contador: devuelve `PRUEBA-XXXX` con el próximo número solo mirado. Aviso amarillo "Modo prueba" en Inicio.
   - Almacenamiento con sufijo `_qas` (`brimahd_db_qas`, `brimahd_config_qas`): QAS y PRD comparten dominio (`isaacjorquera5823-dev.github.io`) y por lo tanto IndexedDB/localStorage — sin el sufijo, probar en QAS podía pisar un borrador real a medio llenar en PRD.
   - El workflow de QAS se niega a publicar si el build no contiene `brimahd_db_qas` (seguro contra gastar números reales).
   - Existe completo (DEV+QAS, contador + almacenamiento separado) en `main`, `maestro-observaciones` y `diseno-visual`; en esta última también la preferencia de tema (`brimahd_tema_oscuro_qas`). Al unificar las ramas, conservar los tres sufijos.
 - ⚠️ **Firestore es uno solo para todos los ambientes.** El modo prueba protege el contador, pero el maestro de observaciones (`config/observacionesMaestro`, solo en `maestro-observaciones`) escribiría en datos reales si QAS apuntara a esa rama, y "Enviar informe" manda correos/WhatsApp reales. Mejora futura: proyecto Firebase separado para QAS.
+- **Publicar/republicar QAS sin `gh`** (no está instalado en el PC): cambiar `RAMA` y pushear; para traer commits nuevos de la misma rama, un commit vacío (`git commit --allow-empty`) en `brimahd-qas`. Para ver si terminó: la API pública `https://api.github.com/repos/isaacjorquera5823-dev/brimahd-qas/actions/runs?per_page=1` (sin login, máx. 60 consultas/hora) o comparar el nombre del `assets/index-*.js` del sitio.
+- El paso final de QAS (`deploy-pages`) a veces falla con "No artifacts named github-pages were found" aunque el build salió bien (2 veces seguidas el 25-nov-2026). Es pasajero de GitHub: reintentar más tarde (otro commit vacío o "Re-run jobs" en Actions).
+- **DEV local**: la configuración `test-pdf` de `.claude/launch.json` levanta este repo en el puerto 5175; la app está en `http://localhost:5175/Brimahd-inspeccion/` (con la ruta, no en la raíz). Para probar informes grandes sin sacar fotos: escribir un borrador directo en IndexedDB (`brimahd_db_qas`, store `borrador`, clave `actual`, formato `{informe, tableroEdit, editIdx, screen}`), recargar y tocar "Continuar informe". Borrarlo al terminar.
 - El repo app vive dentro de OneDrive: `npm install` reescribe miles de archivos en `node_modules` y OneDrive pide confirmar "eliminar N elementos" — es seguro eliminarlos (son regenerables). A futuro conviene mover los repos fuera de OneDrive.
 
 ## Stack
@@ -106,6 +109,7 @@ Isaac viene de SAP y piensa en estos términos — usarlos al hablarle.
 - Vista previa **unificada**: `VistaPreviaInforme` renderiza el HTML final real vía `<iframe srcDoc={...}>` usando la misma función `generarHTMLInforme(inf, cfg)` que la descarga — imposible que diverjan
 - Informe en PDF (`src/pdfInforme.js`, ver abajo) con botón único "Enviar informe"; nombre automático `INF-XXXX - Cliente - fecha.pdf`. Antes de oct 2026 se descargaba en HTML.
 - Vista previa con miniaturas de 900px (`crearMiniatura()`): evita que Safari cierre la pestaña con informes grandes (220 MB → 5 MB con 30 fotos; probado por Emanuel e Isaac en iPhone). El PDF usa las fotos originales.
+- PDF siempre bajo 14 MB (límite de adjuntos de Duoc: 20 MB) y aviso "PDF de X MB" al generarlo — ver "Límite de peso del PDF" más abajo
 - Compresión de fotos (`comprimirImagen()`): máx 1600px, JPEG calidad 0.72 (~200-400KB c/u), con compresión adaptativa más agresiva sobre los 50/100/200 fotos (`parametrosCompresion()`)
 - Autosave en IndexedDB incluye `tableroEdit`, `editIdx` y `screen` actual — el tablero en edición sobrevive a un crash
 - Kill switch de licencia (ver Firebase arriba)
